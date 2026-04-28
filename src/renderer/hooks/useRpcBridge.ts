@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from '../stores';
-import { withDefaultShell } from '../utils/ptyCreateOptions';
+import { withDefaultPtyOptions } from '../utils/ptyCreateOptions';
 import type { Pane, PaneLeaf, Surface } from '../../shared/types';
 import { validateMessage } from '../../shared/types';
 import type { Message, Part, TaskState, Artifact, AgentSkill } from '../../shared/types';
@@ -182,11 +182,13 @@ async function handleRpcMethod(method: string, params: RpcParams): Promise<RpcRe
     const paneId = newWs.activePaneId;
 
     let ptyId: string;
+    let createdCwd = '';
     try {
       const created = await window.electronAPI.pty.create(
-        withDefaultShell({ workspaceId: newWsId }, useStore.getState().defaultShell)
+        withDefaultPtyOptions({ workspaceId: newWsId }, useStore.getState().defaultShell, useStore.getState().defaultCwd)
       );
       ptyId = created.id;
+      createdCwd = created.cwd || '';
     } catch (err) {
       // Roll back: remove the empty workspace so we don't leave orphans.
       const rollback = useStore.getState();
@@ -204,7 +206,7 @@ async function handleRpcMethod(method: string, params: RpcParams): Promise<RpcRe
       afterPty.setActiveWorkspace(previousActiveId);
       return { error: 'mcp.claimWorkspace: pane disappeared during PTY creation' };
     }
-    afterPty.addSurface(paneId, ptyId, '', '');
+    afterPty.addSurface(paneId, ptyId, '', createdCwd);
 
     // Restore focus to whatever the user was looking at before — claim must
     // never steal the active view.
@@ -254,11 +256,13 @@ async function handleRpcMethod(method: string, params: RpcParams): Promise<RpcRe
     const shell = typeof params.shell === 'string' ? params.shell : '';
     const cwd = typeof params.cwd === 'string' ? params.cwd : '';
 
-    const { id: ptyId } = await window.electronAPI.pty.create({
-      ...withDefaultShell({ shell: shell || undefined }, store.defaultShell),
-      cwd: cwd || undefined,
-      workspaceId: ws.id,
-    });
+    const { id: ptyId, cwd: createdCwd } = await window.electronAPI.pty.create(
+      withDefaultPtyOptions({
+        shell: shell || undefined,
+        cwd: cwd || undefined,
+        workspaceId: ws.id,
+      }, store.defaultShell, store.defaultCwd)
+    );
 
     // Re-read state after async gap — paneId may have been removed.
     const freshAfterCreate = useStore.getState();
@@ -268,7 +272,7 @@ async function handleRpcMethod(method: string, params: RpcParams): Promise<RpcRe
       try { await window.electronAPI.pty.dispose(ptyId); } catch { /* best-effort */ }
       return { error: 'pane was removed during PTY creation' };
     }
-    freshAfterCreate.addSurface(paneId, ptyId, shell, cwd);
+    freshAfterCreate.addSurface(paneId, ptyId, shell, createdCwd || cwd);
 
     const fresh = useStore.getState();
     const freshWs = fresh.workspaces.find((w) => w.id === fresh.activeWorkspaceId);

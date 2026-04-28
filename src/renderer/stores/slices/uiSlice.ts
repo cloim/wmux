@@ -58,6 +58,9 @@ export interface UISlice {
   defaultShell: string;
   setDefaultShell: (shell: string) => void;
 
+  defaultCwd: string;
+  setDefaultCwd: (cwd: string) => void;
+
   scrollbackLines: number;
   setScrollbackLines: (lines: number) => void;
 
@@ -312,6 +315,12 @@ export const createUISlice: StateCreator<StoreState, [['zustand/immer', never]],
 
   setDefaultShell: (shell) => set((state) => {
     state.defaultShell = shell;
+  }),
+
+  defaultCwd: '',
+
+  setDefaultCwd: (cwd) => set((state) => {
+    state.defaultCwd = cwd;
   }),
 
   scrollbackLines: 10000,

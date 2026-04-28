@@ -212,6 +212,7 @@ export interface SessionData {
   terminalFontSize?: number;
   terminalFontFamily?: string;
   defaultShell?: string;
+  defaultCwd?: string;
   scrollbackLines?: number;
   sidebarPosition?: 'left' | 'right';
   notificationSoundEnabled?: boolean;

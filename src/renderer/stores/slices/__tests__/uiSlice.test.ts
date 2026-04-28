@@ -71,6 +71,23 @@ describe('UISlice — prefix mode', () => {
   });
 });
 
+describe('UISlice — terminal defaults', () => {
+  let store: ReturnType<typeof createTestStore>;
+
+  beforeEach(() => {
+    store = createTestStore();
+  });
+
+  it('keeps defaultCwd empty by default so PTY creation falls back to the home directory', () => {
+    expect(store.getState().defaultCwd).toBe('');
+  });
+
+  it('stores the configured defaultCwd', () => {
+    store.getState().setDefaultCwd('D:\\Code');
+    expect(store.getState().defaultCwd).toBe('D:\\Code');
+  });
+});
+
 describe('UISlice — pane zoom', () => {
   let store: ReturnType<typeof createTestStore>;
 

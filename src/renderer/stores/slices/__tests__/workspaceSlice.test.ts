@@ -9,6 +9,7 @@ import { createWorkspace, type Workspace } from '../../../../shared/types';
 // real UISlice to keep the test isolated to setActiveWorkspace behavior.
 type TestState = WorkspaceSlice & {
   multiviewIds: string[];
+  defaultCwd: string;
 };
 
 function createTestStore(initialWorkspaces: Workspace[], activeId: string, multiviewIds: string[] = []) {
@@ -22,6 +23,7 @@ function createTestStore(initialWorkspaces: Workspace[], activeId: string, multi
       workspaces: initialWorkspaces,
       activeWorkspaceId: activeId,
       multiviewIds,
+      defaultCwd: '',
     }))
   );
 }
@@ -100,5 +102,21 @@ describe('WorkspaceSlice.setActiveWorkspace', () => {
     store.getState().setActiveWorkspace('ghost');
     expect(store.getState().activeWorkspaceId).toBe(wsA.id);
     expect(store.getState().multiviewIds).toEqual([wsA.id, wsB.id]);
+  });
+});
+
+describe('WorkspaceSlice.loadSession terminal preferences', () => {
+  it('restores defaultCwd from the saved session', () => {
+    const ws = createWorkspace('A');
+    const store = createTestStore([ws], ws.id);
+
+    store.getState().loadSession({
+      workspaces: [ws],
+      activeWorkspaceId: ws.id,
+      sidebarVisible: true,
+      defaultCwd: 'D:\\Code',
+    });
+
+    expect(store.getState().defaultCwd).toBe('D:\\Code');
   });
 });

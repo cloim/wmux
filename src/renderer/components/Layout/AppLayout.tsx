@@ -24,7 +24,7 @@ import { useIpc } from '../../hooks/useIpc';
 import type { SessionData, PaneLeaf, Pane, Surface } from '../../../shared/types';
 import { Terminal } from '@xterm/xterm';
 import { terminalRegistry } from '../../hooks/useTerminal';
-import { withDefaultShell } from '../../utils/ptyCreateOptions';
+import { withDefaultPtyOptions } from '../../utils/ptyCreateOptions';
 
 /** Map shell executable path to a human-readable display name. */
 function shellDisplayName(shellPath: string): string {
@@ -137,6 +137,7 @@ function buildSessionData(dumped: Map<string, boolean>): SessionData {
     terminalFontSize: state.terminalFontSize,
     terminalFontFamily: state.terminalFontFamily,
     defaultShell: state.defaultShell,
+    defaultCwd: state.defaultCwd,
     scrollbackLines: state.scrollbackLines,
     sidebarPosition: state.sidebarPosition,
     notificationSoundEnabled: state.notificationSoundEnabled,
@@ -276,7 +277,7 @@ export default function AppLayout() {
               console.log(`[AppLayout] Surface ${surface.id}: ptyId ${surface.ptyId} not in daemon, creating new PTY`);
               try {
                 const newPty = await window.electronAPI.pty.create(
-                  withDefaultShell({ cwd: surface.cwd, workspaceId: wsId }, useStore.getState().defaultShell)
+                  withDefaultPtyOptions({ cwd: surface.cwd, workspaceId: wsId }, useStore.getState().defaultShell, useStore.getState().defaultCwd)
                 );
                 useStore.getState().updateSurfacePtyId(pane.id, surface.id, newPty.id);
               } catch (err) {
@@ -392,7 +393,7 @@ export default function AppLayout() {
     for (const leaf of emptyLeaves) {
       const paneId = leaf.id;
       window.electronAPI.pty.create(
-        withDefaultShell({ workspaceId: wsId }, useStore.getState().defaultShell)
+        withDefaultPtyOptions({ workspaceId: wsId }, useStore.getState().defaultShell, useStore.getState().defaultCwd)
       ).then((result: { id: string; shell?: string; cwd?: string }) => {
         if (cancelled) {
           window.electronAPI.pty.dispose(result.id);

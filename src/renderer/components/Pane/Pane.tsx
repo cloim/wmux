@@ -9,7 +9,7 @@ import BrowserPanel from '../Browser/BrowserPanel';
 import EditorPanel from '../Editor/EditorPanel';
 import SurfaceTabs from './SurfaceTabs';
 import { ErrorBoundary } from '../ErrorBoundary';
-import { withDefaultShell } from '../../utils/ptyCreateOptions';
+import { withDefaultPtyOptions } from '../../utils/ptyCreateOptions';
 
 interface PaneProps {
   pane: PaneLeaf;
@@ -61,16 +61,17 @@ export default function PaneComponent({ pane, isActive, isWorkspaceVisible = tru
 
   const activeWorkspaceId = useStore((s) => s.activeWorkspaceId);
   const defaultShell = useStore((s) => s.defaultShell);
+  const defaultCwd = useStore((s) => s.defaultCwd);
   const { invoke: ipcInvoke } = useIpc();
   const handleAddSurface = useCallback(async () => {
-    const result = await ipcInvoke<{ id: string }>(() =>
-      window.electronAPI.pty.create(withDefaultShell({ workspaceId: activeWorkspaceId }, defaultShell))
+    const result = await ipcInvoke<{ id: string; cwd?: string }>(() =>
+      window.electronAPI.pty.create(withDefaultPtyOptions({ workspaceId: activeWorkspaceId }, defaultShell, defaultCwd))
     );
     if (result.ok) {
-      addSurface(pane.id, result.data.id, 'Terminal', '');
+      addSurface(pane.id, result.data.id, 'Terminal', result.data.cwd || '');
     }
     // On failure, useIpc already surfaced a toast. No-op here.
-  }, [pane.id, addSurface, activeWorkspaceId, defaultShell, ipcInvoke]);
+  }, [pane.id, addSurface, activeWorkspaceId, defaultShell, defaultCwd, ipcInvoke]);
 
   const closePane = useStore((s) => s.closePane);
 

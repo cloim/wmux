@@ -154,6 +154,35 @@ function SettingNumberInput({
   );
 }
 
+function SettingTextInput({
+  value,
+  onChange,
+  label,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  label: string;
+  placeholder?: string;
+}) {
+  return (
+    <input
+      type="text"
+      aria-label={label}
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      className="text-xs rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-blue)] font-mono"
+      style={{
+        backgroundColor: 'var(--bg-surface)',
+        color: 'var(--text-main)',
+        border: '1px solid var(--bg-overlay)',
+        width: 220,
+      }}
+    />
+  );
+}
+
 // ─── Section divider label ────────────────────────────────────────────────────
 
 function SectionLabel({ label }: { label: string }) {
@@ -415,6 +444,8 @@ function TabGeneral() {
 
   const defaultShell = useStore((s) => s.defaultShell);
   const setDefaultShell = useStore((s) => s.setDefaultShell);
+  const defaultCwd = useStore((s) => s.defaultCwd);
+  const setDefaultCwd = useStore((s) => s.setDefaultCwd);
   const scrollbackLines = useStore((s) => s.scrollbackLines);
   const setScrollbackLines = useStore((s) => s.setScrollbackLines);
   const autoUpdateEnabled = useStore((s) => s.autoUpdateEnabled);
@@ -476,6 +507,14 @@ function TabGeneral() {
             value={defaultShell}
             onChange={setDefaultShell}
             options={shellOptions}
+          />
+        </SettingRow>
+        <SettingRow label={t('settings.defaultCwd')} description={t('settings.defaultCwdDesc')}>
+          <SettingTextInput
+            label={t('settings.defaultCwd')}
+            value={defaultCwd}
+            onChange={setDefaultCwd}
+            placeholder={t('settings.defaultCwdPlaceholder')}
           />
         </SettingRow>
         <SettingRow label={t('settings.scrollbackLines')} description={t('settings.scrollbackDesc')}>

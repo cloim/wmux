@@ -22,3 +22,20 @@ export function withDefaultShell<T extends PtyCreateOptions>(
   if (options.shell || !isExecutableShellValue(defaultShell)) return options;
   return { ...options, shell: defaultShell };
 }
+
+export function withDefaultCwd<T extends PtyCreateOptions>(
+  options: T,
+  defaultCwd: string | undefined,
+): T & { cwd?: string } {
+  const cwd = defaultCwd?.trim();
+  if (options.cwd || !cwd) return options;
+  return { ...options, cwd };
+}
+
+export function withDefaultPtyOptions<T extends PtyCreateOptions>(
+  options: T,
+  defaultShell: string | undefined,
+  defaultCwd: string | undefined,
+): T & { shell?: string; cwd?: string } {
+  return withDefaultCwd(withDefaultShell(options, defaultShell), defaultCwd);
+}
