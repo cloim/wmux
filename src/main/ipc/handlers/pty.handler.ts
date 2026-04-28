@@ -7,6 +7,7 @@ import { PTYBridge } from '../../pty/PTYBridge';
 import { DaemonClient } from '../../DaemonClient';
 import { IPC, getPidMapDir } from '../../../shared/constants';
 import { sanitizePtyText } from '../../../shared/types';
+import type { DaemonEvent } from '../../../shared/rpc';
 import { updateCwd } from './metadata.handler';
 import { wrapHandler } from '../wrapHandler';
 
@@ -63,6 +64,7 @@ export function registerPTYHandlers(
 
   // Track daemon session:data listeners for cleanup
   const daemonSessionListeners: Array<(...args: unknown[]) => void> = [];
+  let onDaemonEvent: ((event: DaemonEvent) => void) | null = null;
 
   // Per-session StringDecoder to handle UTF-8 multi-byte sequences split across chunks
   const sessionDecoders = new Map<string, StringDecoder>();
@@ -78,6 +80,19 @@ export function registerPTYHandlers(
   // pty:create
   ipcMain.removeHandler(IPC.PTY_CREATE);
   if (useDaemon && daemonClient) {
+    onDaemonEvent = (event: DaemonEvent) => {
+      if (event.type !== 'activity.idle') return;
+      const win = getWindow?.();
+      if (!win || win.isDestroyed()) return;
+
+      win.webContents.send(IPC.NOTIFICATION, event.sessionId, {
+        type: 'agent',
+        title: 'Task may have finished',
+        body: 'Terminal output stopped after active period',
+      });
+    };
+    daemonClient.on('event', onDaemonEvent);
+
     ipcMain.handle(IPC.PTY_CREATE, wrapHandler(IPC.PTY_CREATE, async (_event: Electron.IpcMainInvokeEvent, options?: { shell?: string; cwd?: string; cols?: number; rows?: number; workspaceId?: string }) => {
       if (options?.shell !== undefined && !isAllowedShell(options.shell)) {
         throw new Error(`PTY_CREATE: shell not allowed: ${options.shell}`);
@@ -271,7 +286,7 @@ export function registerPTYHandlers(
       if (win && !win.isDestroyed()) {
         win.webContents.send(IPC.PTY_EXIT, payload.sessionId, payload.exitCode ?? -1);
       }
-      daemonClient.disconnectSessionPipe(payload.sessionId).catch(() => {});
+      daemonClient.disconnectSessionPipe(payload.sessionId).catch(() => undefined);
     };
     daemonClient.on('session:died', onDaemonSessionDied);
   }
@@ -289,6 +304,9 @@ export function registerPTYHandlers(
     if (daemonClient) {
       for (const listener of daemonSessionListeners) {
         daemonClient.removeListener('session:data', listener);
+      }
+      if (onDaemonEvent) {
+        daemonClient.removeListener('event', onDaemonEvent);
       }
       if (onDaemonSessionDied) {
         daemonClient.removeListener('session:died', onDaemonSessionDied);

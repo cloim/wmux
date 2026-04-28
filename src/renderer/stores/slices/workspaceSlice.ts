@@ -128,9 +128,10 @@ export const createWorkspaceSlice: StateCreator<StoreState, [['zustand/immer', n
     reorderWorkspace: (fromIndex, toIndex) => set((state: StoreState) => {
       if (fromIndex === toIndex) return;
       if (fromIndex < 0 || fromIndex >= state.workspaces.length) return;
-      if (toIndex < 0 || toIndex >= state.workspaces.length) return;
+      const targetIndex = Math.max(0, Math.min(toIndex, state.workspaces.length - 1));
+      if (fromIndex === targetIndex) return;
       const [removed] = state.workspaces.splice(fromIndex, 1);
-      state.workspaces.splice(toIndex, 0, removed);
+      state.workspaces.splice(targetIndex, 0, removed);
     }),
 
     loadSession: (data: SessionData) => set((state: StoreState) => {

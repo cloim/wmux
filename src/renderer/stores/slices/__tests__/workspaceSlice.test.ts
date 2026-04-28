@@ -153,6 +153,45 @@ describe('WorkspaceSlice.setActiveWorkspace', () => {
   });
 });
 
+describe('WorkspaceSlice.reorderWorkspace', () => {
+  let wsA: Workspace;
+  let wsB: Workspace;
+  let wsC: Workspace;
+
+  beforeEach(() => {
+    wsA = createWorkspace('A');
+    wsB = createWorkspace('B');
+    wsC = createWorkspace('C');
+  });
+
+  it('moves a workspace to a new index without changing the active workspace', () => {
+    const store = createTestStore([wsA, wsB, wsC], wsB.id);
+
+    store.getState().reorderWorkspace(0, 2);
+
+    expect(store.getState().workspaces.map((ws) => ws.id)).toEqual([wsB.id, wsC.id, wsA.id]);
+    expect(store.getState().activeWorkspaceId).toBe(wsB.id);
+  });
+
+  it('clamps target indexes so dragging beyond the list drops at the nearest edge', () => {
+    const store = createTestStore([wsA, wsB, wsC], wsA.id);
+
+    store.getState().reorderWorkspace(0, 99);
+    expect(store.getState().workspaces.map((ws) => ws.id)).toEqual([wsB.id, wsC.id, wsA.id]);
+
+    store.getState().reorderWorkspace(2, -99);
+    expect(store.getState().workspaces.map((ws) => ws.id)).toEqual([wsA.id, wsB.id, wsC.id]);
+  });
+
+  it('ignores invalid source indexes', () => {
+    const store = createTestStore([wsA, wsB, wsC], wsA.id);
+
+    store.getState().reorderWorkspace(99, 0);
+
+    expect(store.getState().workspaces.map((ws) => ws.id)).toEqual([wsA.id, wsB.id, wsC.id]);
+  });
+});
+
 describe('WorkspaceSlice.loadSession terminal preferences', () => {
   it('restores defaultCwd from the saved session', () => {
     const ws = createWorkspace('A');

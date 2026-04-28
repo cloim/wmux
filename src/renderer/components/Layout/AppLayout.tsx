@@ -25,6 +25,7 @@ import type { SessionData, PaneLeaf, Pane, Surface } from '../../../shared/types
 import { Terminal } from '@xterm/xterm';
 import { terminalRegistry } from '../../hooks/useTerminal';
 import { withDefaultPtyOptions } from '../../utils/ptyCreateOptions';
+import { isFileDrag } from '../../../shared/dragDrop';
 
 /** Map shell executable path to a human-readable display name. */
 function shellDisplayName(shellPath: string): string {
@@ -92,7 +93,7 @@ function dumpScrollbackBuffersSync(): Map<string, boolean> {
       const content = serializeTerminalBuffer(terminal);
       if (!content) continue;
       dumped.set(surface.id, true);
-      window.electronAPI.scrollback.dump(surface.id, content).catch(() => {});
+      window.electronAPI.scrollback.dump(surface.id, content).catch(() => undefined);
     }
   }
   return dumped;
@@ -218,12 +219,14 @@ export default function AppLayout() {
 
     // Visual drag overlay
     const onEnter = (e: DragEvent) => {
+      if (!isFileDrag(e.dataTransfer)) return;
       e.preventDefault();
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
       dragCounterRef.current++;
       if (dragCounterRef.current === 1) setIsDragging(true);
     };
-    const onLeave = () => {
+    const onLeave = (e: DragEvent) => {
+      if (!isFileDrag(e.dataTransfer)) return;
       dragCounterRef.current--;
       if (dragCounterRef.current <= 0) {
         dragCounterRef.current = 0;

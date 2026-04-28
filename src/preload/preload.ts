@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { IPC } from '../shared/constants';
+import { isFileDrag } from '../shared/dragDrop';
 
 const electronAPI = {
   pty: {
@@ -153,10 +154,12 @@ const fileDropCallbacks: ((paths: string[]) => void)[] = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('dragover', (e) => {
+    if (!isFileDrag(e.dataTransfer)) return;
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
   });
   document.addEventListener('drop', (e) => {
+    if (!isFileDrag(e.dataTransfer)) return;
     e.preventDefault();
     const files = e.dataTransfer?.files;
     if (!files || files.length === 0) return;

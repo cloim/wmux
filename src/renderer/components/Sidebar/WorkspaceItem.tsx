@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import type { AgentStatus, Workspace } from '../../../shared/types';
 import { useStore } from '../../stores';
 import { useT } from '../../hooks/useT';
+import { countUnreadForWorkspace } from '../../utils/workspaceUnread';
 
 interface WorkspaceItemProps {
   workspace: Workspace;
@@ -39,13 +40,6 @@ function AgentStatusDot({ status, agentName }: { status: AgentStatus; agentName?
   );
 }
 
-function shortenPath(path: string, maxLen = 25): string {
-  if (!path || path.length <= maxLen) return path;
-  const parts = path.replace(/\\/g, '/').split('/');
-  if (parts.length <= 2) return path;
-  return `.../${parts.slice(-2).join('/')}`;
-}
-
 export default function WorkspaceItem({ workspace, isActive, isMultiview, index, onSelect, onCtrlSelect, onRename, onClose, onCopyInfo, onReorder }: WorkspaceItemProps) {
   const t = useT();
   const [editing, setEditing] = useState(false);
@@ -55,9 +49,7 @@ export default function WorkspaceItem({ workspace, isActive, isMultiview, index,
   const inputRef = useRef<HTMLInputElement>(null);
   const dragStartTimeRef = useRef<number>(0);
 
-  const unreadCount = useStore((s) =>
-    s.notifications.filter((n) => !n.read && n.workspaceId === workspace.id).length,
-  );
+  const unreadCount = useStore((s) => countUnreadForWorkspace(s.notifications, workspace.id));
 
   const metadata = workspace.metadata;
 

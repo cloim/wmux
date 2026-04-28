@@ -1,5 +1,7 @@
 import { useStore } from '../../stores';
 import { useT } from '../../hooks/useT';
+import { useState } from 'react';
+import { countUnreadForWorkspace } from '../../utils/workspaceUnread';
 
 export default function MiniSidebar() {
   const t = useT();
@@ -7,12 +9,33 @@ export default function MiniSidebar() {
   const workspaces = useStore((s) => s.workspaces);
   const activeWorkspaceId = useStore((s) => s.activeWorkspaceId);
   const setActiveWorkspace = useStore((s) => s.setActiveWorkspace);
+  const reorderWorkspace = useStore((s) => s.reorderWorkspace);
   const toggleSidebar = useStore((s) => s.toggleSidebar);
+  const notifications = useStore((s) => s.notifications);
   const totalUnread = useStore((s) =>
     s.notifications.filter((n) => !n.read).length,
   );
 
   const addWorkspace = useStore((s) => s.addWorkspace);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+
+  const getDropIndex = (e: React.DragEvent<HTMLElement>, index: number): number => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    return e.clientY < midY ? index : index + 1;
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLElement>, index: number) => {
+    e.preventDefault();
+    const fromIndex = Number.parseInt(e.dataTransfer.getData('text/plain'), 10);
+    const rawDropIndex = getDropIndex(e, index);
+    setDropIndex(null);
+    setDraggingIndex(null);
+    if (!Number.isInteger(fromIndex)) return;
+    const toIndex = rawDropIndex > fromIndex ? rawDropIndex - 1 : rawDropIndex;
+    reorderWorkspace(fromIndex, toIndex);
+  };
 
   return (
     <div className={`flex flex-col h-full bg-[var(--bg-mantle)] ${sidebarPosition === 'right' ? 'border-l' : 'border-r'} border-[var(--bg-surface)]`} style={{ width: 48 }}>
@@ -31,20 +54,54 @@ export default function MiniSidebar() {
         {workspaces.map((ws, i) => {
           const isActive = ws.id === activeWorkspaceId;
           const initial = ws.name.charAt(0).toUpperCase();
+          const unreadCount = countUnreadForWorkspace(notifications, ws.id);
 
           return (
-            <button
-              key={ws.id}
-              className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold font-mono transition-colors ${
-                isActive
-                  ? 'bg-[var(--bg-surface)] text-[var(--text-main)]'
-                  : 'text-[var(--text-muted)] hover:bg-[rgba(var(--bg-surface-rgb),0.5)] hover:text-[var(--text-sub)]'
-              }`}
-              onClick={() => setActiveWorkspace(ws.id)}
-              title={`${ws.name} (Ctrl+${i + 1})`}
-            >
-              {initial}
-            </button>
+            <div key={ws.id} className="relative">
+              {dropIndex === i && (
+                <div className="absolute -top-0.5 left-0 right-0 h-0.5 bg-[var(--accent-blue)] rounded-full" />
+              )}
+              <button
+                draggable
+                className={`relative w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold font-mono transition-colors ${
+                  isActive
+                    ? 'bg-[var(--bg-surface)] text-[var(--text-main)]'
+                    : 'text-[var(--text-muted)] hover:bg-[rgba(var(--bg-surface-rgb),0.5)] hover:text-[var(--text-sub)]'
+                } ${draggingIndex === i ? 'opacity-40' : 'opacity-100'}`}
+                onClick={() => setActiveWorkspace(ws.id)}
+                onDragStart={(e) => {
+                  setDraggingIndex(i);
+                  e.dataTransfer.setData('text/plain', String(i));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  setDropIndex(getDropIndex(e, i));
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node)) {
+                    setDropIndex(null);
+                  }
+                }}
+                onDrop={(e) => handleDrop(e, i)}
+                onDragEnd={() => {
+                  setDraggingIndex(null);
+                  setDropIndex(null);
+                }}
+                title={`${ws.name} (Ctrl+${i + 1})`}
+              >
+                {initial}
+                {unreadCount > 0 && (
+                  <span className="pointer-events-none absolute -right-1 -top-1 min-w-[14px] h-3.5 rounded-full bg-[var(--accent-blue)] text-[var(--bg-base)] text-[8px] font-bold leading-none flex items-center justify-center px-0.5">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              {i === workspaces.length - 1 && dropIndex === workspaces.length && (
+                <div className="absolute -bottom-0.5 left-0 right-0 h-0.5 bg-[var(--accent-blue)] rounded-full" />
+              )}
+            </div>
           );
         })}
       </div>
