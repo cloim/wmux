@@ -3,7 +3,7 @@ import path from 'path';
 
 let tray: Tray | null = null;
 
-export function createTray(mainWindow: BrowserWindow, onQuit: () => void): Tray {
+export function createTray(mainWindow: BrowserWindow): Tray {
   // In packaged app, extraResource files land in <exe_dir>/resources/
   // In dev, assets are at project root: <__dirname>/../../assets/
   const iconPath = app.isPackaged
@@ -25,7 +25,6 @@ export function createTray(mainWindow: BrowserWindow, onQuit: () => void): Tray 
     {
       label: 'Quit',
       click: () => {
-        onQuit();
         app.quit();
       },
     },

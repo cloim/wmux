@@ -270,7 +270,7 @@ app.on('ready', async () => {
   });
 
   // System tray — lets the app stay alive when window is closed
-  createTray(mainWindow, () => { isQuitting = true; });
+  createTray(mainWindow);
 
   // Auto-start daemon and connect
   try {
