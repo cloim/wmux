@@ -13,6 +13,7 @@ internal static class WmuxConsoleInput
     private const uint OPEN_EXISTING = 3;
     private const ushort VK_RETURN = 0x0D;
     private const ushort VK_TAB = 0x09;
+    private const ushort VK_PACKET = 0xE7;
     private static readonly IntPtr INVALID_HANDLE_VALUE = new IntPtr(-1);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -196,6 +197,6 @@ internal static class WmuxConsoleInput
     {
         if (ch == '\r') return VK_RETURN;
         if (ch == '\t') return VK_TAB;
-        return 0;
+        return VK_PACKET;
     }
 }
