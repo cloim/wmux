@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "wmux: Electron Forge Start",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/@electron-forge/cli/dist/electron-forge-start.js",
+      "args": [
+        "--vscode"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "preLaunchTask": "wmux: build required bundles",
+      "autoAttachChildProcesses": true,
+      "skipFiles": [
+        "<node_internals>/**",
+        "${workspaceFolder}/node_modules/**"
+      ],
+      "env": {
+        "NODE_ENV": "development"
+      }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "wmux: build daemon",
+      "type": "npm",
+      "script": "build:daemon",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "wmux: build mcp",
+      "type": "npm",
+      "script": "build:mcp",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "wmux: build required bundles",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "wmux: build daemon",
+        "wmux: build mcp"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}
