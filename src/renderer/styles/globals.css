@@ -285,10 +285,10 @@ html, body, #root {
 .workspace-output-spinner::before,
 .workspace-output-tile::after {
   background:
-    radial-gradient(circle, #5A5B70 0 2.4px, transparent 2.6px),
-    radial-gradient(circle, #5A5B70 0 2.4px, transparent 2.6px),
-    radial-gradient(circle, #5A5B70 0 2.4px, transparent 2.6px),
-    radial-gradient(circle, #5A5B70 0 2.4px, transparent 2.6px);
+    radial-gradient(circle, #A9A199 0 2.4px, transparent 2.6px),
+    radial-gradient(circle, #A9A199 0 2.4px, transparent 2.6px),
+    radial-gradient(circle, #A9A199 0 2.4px, transparent 2.6px),
+    radial-gradient(circle, #A9A199 0 2.4px, transparent 2.6px);
   background-position: 50% 50%, 50% 50%, 50% 50%, 50% 50%;
   background-repeat: no-repeat;
   background-size: 4.8px 4.8px;
