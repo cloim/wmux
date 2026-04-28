@@ -1,10 +1,15 @@
-import { BrowserWindow, shell } from 'electron';
+import { BrowserWindow, screen, shell } from 'electron';
 import path from 'node:path';
+import type { WindowState } from '../../shared/types';
+import { normalizeWindowState } from './windowState';
 
-export function createWindow(): BrowserWindow {
+export function createWindow(savedWindowState?: WindowState | null): BrowserWindow {
+  const windowState = normalizeWindowState(
+    savedWindowState,
+    screen.getAllDisplays().map((display) => display.workArea),
+  );
   const mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    ...windowState.bounds,
     minWidth: 800,
     minHeight: 600,
     title: 'wmux',
@@ -19,6 +24,12 @@ export function createWindow(): BrowserWindow {
       webviewTag: true,
     },
   });
+
+  if (windowState.isFullScreen) {
+    mainWindow.setFullScreen(true);
+  } else if (windowState.isMaximized) {
+    mainWindow.maximize();
+  }
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);

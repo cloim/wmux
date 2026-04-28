@@ -31,6 +31,8 @@ import { DaemonClient, getDaemonPipeName, readDaemonAuthToken } from './DaemonCl
 import { ensureDaemon } from './daemon/launcher';
 import { createTray, destroyTray } from './tray';
 import { ProcessMonitor } from '../daemon/ProcessMonitor';
+import { SessionManager } from './session/SessionManager';
+import { snapshotWindowState } from './window/windowState';
 
 // Force English for Chromium internal messages to avoid encoding corruption
 // on non-ASCII locales (e.g. Korean Windows where cp949 garbles console output).
@@ -158,6 +160,7 @@ const rpcRouter = new RpcRouter();
 const pipeServer = new PipeServer(rpcRouter);
 const mcpRegistrar = new McpRegistrar();
 const webviewCdpManager = new WebviewCdpManager(cdpPort);
+const sessionManager = new SessionManager();
 
 const claudeWorker = new ClaudeWorker(() => mainWindow);
 
@@ -169,6 +172,20 @@ let cleanupHandlers = registerAllHandlers(ptyManager, ptyBridge, () => mainWindo
 // Module-scope crash tracking so activate-created windows share the same counters
 let lastCrashTime = 0;
 let crashCount = 0;
+
+function loadSavedWindowState() {
+  return sessionManager.load()?.windowState;
+}
+
+function saveCurrentWindowStateSync(): void {
+  const existing = sessionManager.load();
+  if (!existing) return;
+
+  const windowState = mainWindow && !mainWindow.isDestroyed()
+    ? snapshotWindowState(mainWindow)
+    : existing.windowState;
+  sessionManager.save({ ...existing, windowState });
+}
 
 function attachWindowRecovery(win: BrowserWindow): void {
   win.webContents.on('render-process-gone', (_event, details) => {
@@ -239,7 +256,7 @@ ipcMain.handle('browser:register-webview', async (_event, surfaceId: string, web
 console.log('[DEBUG] registering app.on(ready)');
 app.on('ready', async () => {
   console.log('[Main] App ready, creating window...');
-  mainWindow = createWindow();
+  mainWindow = createWindow(loadSavedWindowState());
   console.log(`[Main] Window created: ${!!mainWindow}`);
 
   attachWindowRecovery(mainWindow);
@@ -433,13 +450,7 @@ if (process.platform === 'win32') {
   app.on('session-end' as any, () => {
     console.log('[Main] session-end received — emergency sync save');
     try {
-      // Import SessionManager lazily to avoid circular deps
-      const { SessionManager } = require('./session/SessionManager');
-      const sm = new SessionManager();
-      const existing = sm.load();
-      if (existing) {
-        sm.save(existing); // ensure last periodic save is flushed to disk
-      }
+      saveCurrentWindowStateSync();
     } catch (err) {
       console.error('[Main] Emergency session save failed:', err);
     }
@@ -458,7 +469,7 @@ if (process.platform === 'win32') {
 app.on('activate', () => {
   if (isQuitting) return;
   if (BrowserWindow.getAllWindows().length === 0) {
-    mainWindow = createWindow();
+    mainWindow = createWindow(loadSavedWindowState());
     attachWindowRecovery(mainWindow);
   }
 });

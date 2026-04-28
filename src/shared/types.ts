@@ -202,10 +202,24 @@ export const DEFAULT_PREFIX_CONFIG: PrefixConfig = {
 };
 
 // === Session: serialized app state ===
+export interface WindowBounds {
+  x?: number;
+  y?: number;
+  width: number;
+  height: number;
+}
+
+export interface WindowState {
+  bounds?: WindowBounds;
+  isMaximized?: boolean;
+  isFullScreen?: boolean;
+}
+
 export interface SessionData {
   workspaces: Workspace[];
   activeWorkspaceId: string;
   sidebarVisible: boolean;
+  windowState?: WindowState;
   // User preferences (persisted across restarts)
   theme?: string;
   locale?: string;

@@ -18,7 +18,7 @@ export function registerAllHandlers(
   daemonClient?: DaemonClient,
 ): () => void {
   const cleanupPty = registerPTYHandlers(ptyManager, ptyBridge, daemonClient, getWindow);
-  const cleanupSession = registerSessionHandlers();
+  const cleanupSession = registerSessionHandlers(getWindow);
   const cleanupShell = registerShellHandlers();
   const cleanupMetadata = registerMetadataHandlers(ptyManager, getWindow);
   registerClipboardHandlers();

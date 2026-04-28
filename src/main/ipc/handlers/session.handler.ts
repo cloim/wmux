@@ -5,13 +5,18 @@ import { IPC } from '../../../shared/constants';
 import { SessionManager } from '../../session/SessionManager';
 import type { SessionData } from '../../../shared/types';
 import { wrapHandler } from '../wrapHandler';
+import { snapshotWindowState } from '../../window/windowState';
 
 const sessionManager = new SessionManager();
 
-export function registerSessionHandlers(): () => void {
+export function registerSessionHandlers(getWindow?: () => Electron.BrowserWindow | null): () => void {
   ipcMain.removeHandler(IPC.SESSION_SAVE);
   ipcMain.handle(IPC.SESSION_SAVE, wrapHandler(IPC.SESSION_SAVE, (_event: Electron.IpcMainInvokeEvent, data: SessionData) => {
-    sessionManager.save(data);
+    const win = getWindow?.();
+    const windowState = win && !win.isDestroyed()
+      ? snapshotWindowState(win)
+      : data.windowState;
+    sessionManager.save({ ...data, windowState });
     return { success: true };
   }));
 
