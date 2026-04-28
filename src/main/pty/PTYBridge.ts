@@ -7,6 +7,7 @@ import { ActivityMonitor } from './ActivityMonitor';
 import { toastManager } from '../pipe/handlers/notify.rpc';
 import { IPC } from '../../shared/constants';
 import { updateCwd, removeCwd, updateBranch, removeBranch } from '../ipc/handlers/metadata.handler';
+import { normalizeOsc7Cwd } from '../../shared/cwd';
 
 /**
  * A middleware handler receives raw data from a PTY process.
@@ -123,7 +124,7 @@ export class PTYBridge {
 
       switch (event.code) {
         case 7: {
-          const cwd = event.data.replace(/^file:\/\/[^/]*/, '');
+          const cwd = normalizeOsc7Cwd(event.data, process.platform);
           updateCwd(ptyId, cwd);
           win.webContents.send(IPC.CWD_CHANGED, ptyId, cwd);
           break;

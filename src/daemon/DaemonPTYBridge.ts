@@ -5,6 +5,7 @@ import { AgentDetector } from '../main/pty/AgentDetector';
 import { ActivityMonitor } from '../main/pty/ActivityMonitor';
 import { RingBuffer } from './RingBuffer';
 import { PromptEventLog, parseOsc133Payload } from './PromptEventLog';
+import { normalizeOsc7Cwd } from '../shared/cwd';
 
 /**
  * Daemon version of PTYBridge.
@@ -57,7 +58,7 @@ export class DaemonPTYBridge extends EventEmitter {
     // OSC events → cwd (OSC 7) and prompt/command markers (OSC 133)
     oscParser.onOsc((event) => {
       if (event.code === 7) {
-        const cwd = event.data.replace(/^file:\/\/[^/]*/, '');
+        const cwd = normalizeOsc7Cwd(event.data, process.platform);
         this.emit('cwd', { sessionId, cwd });
         return;
       }

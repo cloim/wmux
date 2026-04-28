@@ -4,8 +4,10 @@ import path from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import { PTYManager } from '../../pty/PTYManager';
 import { PTYBridge } from '../../pty/PTYBridge';
+import { OscParser } from '../../pty/OscParser';
 import { DaemonClient } from '../../DaemonClient';
 import { IPC, getPidMapDir } from '../../../shared/constants';
+import { normalizeOsc7Cwd, normalizeStoredCwd } from '../../../shared/cwd';
 import { sanitizePtyText } from '../../../shared/types';
 import type { DaemonEvent } from '../../../shared/rpc';
 import { updateCwd } from './metadata.handler';
@@ -25,6 +27,11 @@ const ALLOWED_SHELLS = new Set([
   'sh.exe',
 ]);
 
+// Prompt-based fallback used when shell integration OSC is unavailable.
+// eslint-disable-next-line no-control-regex
+const ANSI_STRIP = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b\[[\?]?[0-9;]*[hlm]/g;
+const PROMPT_CWD = /(?:PS\s+([A-Za-z]:\\[^>]*?)>)|(?:\w+@[\w.-]+:([^\$]+?)\$)/;
+
 function isAllowedShell(shell: string): boolean {
   const basename = path.basename(shell).toLowerCase();
   return ALLOWED_SHELLS.has(basename);
@@ -35,8 +42,9 @@ function isAllowedShell(shell: string): boolean {
  * Shared by both daemon and local modes.
  */
 function validateCwd(cwd: string | undefined): string | undefined {
-  if (!cwd) return undefined;
-  const resolved = path.resolve(cwd);
+  const normalized = normalizeStoredCwd(cwd);
+  if (!normalized) return undefined;
+  const resolved = path.resolve(normalized);
   // Block UNC paths (e.g. \\server\share)
   if (resolved.startsWith('\\\\')) return undefined;
   if (!fs.existsSync(resolved)) return undefined;
@@ -52,6 +60,45 @@ function writePidMap(key: string | number, workspaceId: string): void {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, String(key)), workspaceId, 'utf8');
   } catch { /* best-effort */ }
+}
+
+function createDaemonCwdForwarder(
+  sessionId: string,
+  getWindow: (() => BrowserWindow | null) | undefined,
+): (text: string) => void {
+  const oscParser = new OscParser();
+  let lastCwd = '';
+  let promptBuffer = '';
+
+  const forwardCwd = (cwd: string) => {
+    if (!cwd || cwd === lastCwd) return;
+    lastCwd = cwd;
+    updateCwd(sessionId, cwd);
+    const win = getWindow?.();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send(IPC.CWD_CHANGED, sessionId, cwd);
+    }
+  };
+
+  oscParser.onOsc((event) => {
+    if (event.code === 7) {
+      forwardCwd(normalizeOsc7Cwd(event.data, process.platform));
+    }
+  });
+
+  return (text: string) => {
+    oscParser.process(text);
+
+    promptBuffer += text;
+    if (promptBuffer.length > 1024) promptBuffer = promptBuffer.slice(-512);
+    const clean = promptBuffer.replace(ANSI_STRIP, '');
+    const promptMatch = clean.match(PROMPT_CWD);
+    if (promptMatch) {
+      const detectedCwd = (promptMatch[1] || promptMatch[2] || '').trim();
+      forwardCwd(detectedCwd);
+      promptBuffer = '';
+    }
+  };
 }
 
 export function registerPTYHandlers(
@@ -122,12 +169,16 @@ export function registerPTYHandlers(
       await daemonClient.connectSessionPipe(sessionId);
 
       // Forward session data to renderer
+      const forwardCwd = createDaemonCwdForwarder(sessionId, getWindow);
       const onSessionData = (payload: { sessionId: string; data: Buffer }) => {
         if (payload.sessionId !== sessionId) return;
         const win = getWindow?.();
         if (win && !win.isDestroyed()) {
           const text = decodeSessionData(sessionId, payload.data);
-          if (text) win.webContents.send(IPC.PTY_DATA, sessionId, text);
+          if (text) {
+            forwardCwd(text);
+            win.webContents.send(IPC.PTY_DATA, sessionId, text);
+          }
         }
       };
       daemonClient.on('session:data', onSessionData as (...args: unknown[]) => void);
@@ -252,12 +303,16 @@ export function registerPTYHandlers(
         await daemonClient.connectSessionPipe(id);
 
         // Set up data forwarding
+        const forwardCwd = createDaemonCwdForwarder(id, getWindow);
         const onSessionData = (payload: { sessionId: string; data: Buffer }) => {
           if (payload.sessionId !== id) return;
           const win = getWindow?.();
           if (win && !win.isDestroyed()) {
             const text = decodeSessionData(id, payload.data);
-            if (text) win.webContents.send(IPC.PTY_DATA, id, text);
+            if (text) {
+              forwardCwd(text);
+              win.webContents.send(IPC.PTY_DATA, id, text);
+            }
           }
         };
         daemonClient.on('session:data', onSessionData as (...args: unknown[]) => void);

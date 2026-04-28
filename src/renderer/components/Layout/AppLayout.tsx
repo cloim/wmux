@@ -26,6 +26,7 @@ import type { SessionData, PaneLeaf, Pane, Surface } from '../../../shared/types
 import { Terminal } from '@xterm/xterm';
 import { terminalRegistry } from '../../hooks/useTerminal';
 import { withDefaultPtyOptions } from '../../utils/ptyCreateOptions';
+import { resolveRestoredSurfaceCwd } from '../../utils/restoreCwd';
 import { isFileDrag } from '../../../shared/dragDrop';
 
 /** Map shell executable path to a human-readable display name. */
@@ -262,7 +263,7 @@ export default function AppLayout() {
       console.log('[AppLayout] Daemon active PTYs:', [...activeIds]);
 
       const state = useStore.getState();
-      const reconcile = async (pane: Pane, wsId: string) => {
+      const reconcile = async (pane: Pane, wsId: string, workspaceCwd?: string) => {
         if (pane.type === 'leaf') {
           for (const surface of pane.surfaces) {
             if (surface.surfaceType === 'browser' || surface.surfaceType === 'editor') continue;
@@ -281,8 +282,9 @@ export default function AppLayout() {
             } else {
               console.log(`[AppLayout] Surface ${surface.id}: ptyId ${surface.ptyId} not in daemon, creating new PTY`);
               try {
+                const cwd = resolveRestoredSurfaceCwd(surface.cwd, workspaceCwd);
                 const newPty = await window.electronAPI.pty.create(
-                  withDefaultPtyOptions({ cwd: surface.cwd, workspaceId: wsId }, useStore.getState().defaultShell, useStore.getState().defaultCwd)
+                  withDefaultPtyOptions({ cwd, workspaceId: wsId }, useStore.getState().defaultShell, useStore.getState().defaultCwd)
                 );
                 useStore.getState().updateSurfacePtyId(pane.id, surface.id, newPty.id);
               } catch (err) {
@@ -292,13 +294,13 @@ export default function AppLayout() {
             }
           }
         } else {
-          for (const child of pane.children) await reconcile(child, wsId);
+          for (const child of pane.children) await reconcile(child, wsId, workspaceCwd);
         }
       };
 
       for (const ws of state.workspaces) {
         console.log(`[AppLayout] Reconciling workspace: ${ws.name}`);
-        await reconcile(ws.rootPane, ws.id);
+        await reconcile(ws.rootPane, ws.id, ws.metadata?.cwd);
       }
       console.log('[AppLayout] Reconciliation complete');
     } catch (err) {
