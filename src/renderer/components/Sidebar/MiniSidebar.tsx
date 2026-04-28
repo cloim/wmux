@@ -1,7 +1,6 @@
 import { useStore } from '../../stores';
 import { useT } from '../../hooks/useT';
 import { useState } from 'react';
-import { countUnreadForWorkspace } from '../../utils/workspaceUnread';
 
 export default function MiniSidebar() {
   const t = useT();
@@ -11,10 +10,10 @@ export default function MiniSidebar() {
   const setActiveWorkspace = useStore((s) => s.setActiveWorkspace);
   const reorderWorkspace = useStore((s) => s.reorderWorkspace);
   const toggleSidebar = useStore((s) => s.toggleSidebar);
-  const notifications = useStore((s) => s.notifications);
   const totalUnread = useStore((s) =>
     s.notifications.filter((n) => !n.read).length,
   );
+  const workspaceOutputActive = useStore((s) => s.workspaceOutputActive);
 
   const addWorkspace = useStore((s) => s.addWorkspace);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
@@ -54,7 +53,7 @@ export default function MiniSidebar() {
         {workspaces.map((ws, i) => {
           const isActive = ws.id === activeWorkspaceId;
           const initial = ws.name.charAt(0).toUpperCase();
-          const unreadCount = countUnreadForWorkspace(notifications, ws.id);
+          const outputActive = workspaceOutputActive[ws.id] === true;
 
           return (
             <div key={ws.id} className="relative">
@@ -67,7 +66,7 @@ export default function MiniSidebar() {
                   isActive
                     ? 'bg-[var(--bg-surface)] text-[var(--text-main)]'
                     : 'text-[var(--text-muted)] hover:bg-[rgba(var(--bg-surface-rgb),0.5)] hover:text-[var(--text-sub)]'
-                } ${draggingIndex === i ? 'opacity-40' : 'opacity-100'}`}
+                } ${outputActive ? 'workspace-output-tile' : ''} ${draggingIndex === i ? 'opacity-40' : 'opacity-100'}`}
                 onClick={() => setActiveWorkspace(ws.id)}
                 onDragStart={(e) => {
                   setDraggingIndex(i);
@@ -92,11 +91,6 @@ export default function MiniSidebar() {
                 title={`${ws.name} (Ctrl+${i + 1})`}
               >
                 {initial}
-                {unreadCount > 0 && (
-                  <span className="pointer-events-none absolute -right-1 -top-1 min-w-[14px] h-3.5 rounded-full bg-[var(--accent-blue)] text-[var(--bg-base)] text-[8px] font-bold leading-none flex items-center justify-center px-0.5">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
               </button>
               {i === workspaces.length - 1 && dropIndex === workspaces.length && (
                 <div className="absolute -bottom-0.5 left-0 right-0 h-0.5 bg-[var(--accent-blue)] rounded-full" />

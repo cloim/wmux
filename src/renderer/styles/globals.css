@@ -253,6 +253,42 @@ html, body, #root {
   animation: notification-ring-pulse 2s ease-in-out infinite;
 }
 
+@keyframes workspace-output-spin {
+  to { transform: rotate(360deg); }
+}
+
+.workspace-output-spinner {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  animation: workspace-output-spin 0.9s linear infinite;
+}
+
+.workspace-output-spinner::before,
+.workspace-output-tile::after {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--text-main);
+  box-shadow:
+    -4px 6px 0 var(--text-main),
+    4px 6px 0 var(--text-main);
+}
+
+.workspace-output-spinner::before {
+  left: 4px;
+  top: 1px;
+}
+
+.workspace-output-tile::after {
+  left: 6px;
+  top: 3px;
+  transform-origin: 1px 5px;
+  animation: workspace-output-spin 0.9s linear infinite;
+}
+
 /* Notification panel slide-in */
 @keyframes notification-slide-in {
   from { transform: translateX(100%); }

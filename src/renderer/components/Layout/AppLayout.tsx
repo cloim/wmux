@@ -18,6 +18,7 @@ import FloatingPane from '../Terminal/FloatingPane';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { useKeyboard } from '../../hooks/useKeyboard';
 import { useNotificationListener } from '../../hooks/useNotificationListener';
+import { useWorkspaceOutputActivity } from '../../hooks/useWorkspaceOutputActivity';
 import { useRpcBridge } from '../../hooks/useRpcBridge';
 import { useResizeGuard } from '../../hooks/useResizeGuard';
 import { useIpc } from '../../hooks/useIpc';
@@ -181,6 +182,7 @@ export default function AppLayout() {
 
   useKeyboard();
   useNotificationListener();
+  useWorkspaceOutputActivity();
   useRpcBridge();
   const { invoke: ipcInvoke } = useIpc();
 

@@ -79,6 +79,9 @@ export interface UISlice {
   notificationRingEnabled: boolean;
   setNotificationRingEnabled: (enabled: boolean) => void;
 
+  workspaceOutputActive: Record<string, boolean>;
+  setWorkspaceOutputActive: (workspaceId: string, active: boolean) => void;
+
   // ─── Multiview ─────────────────────────────────────────────────────────
   multiviewIds: string[];
   toggleMultiviewWorkspace: (wsId: string) => void;
@@ -367,6 +370,12 @@ export const createUISlice: StateCreator<StoreState, [['zustand/immer', never]],
 
   setNotificationRingEnabled: (enabled) => set((state) => {
     state.notificationRingEnabled = enabled;
+  }),
+
+  workspaceOutputActive: {},
+
+  setWorkspaceOutputActive: (workspaceId, active) => set((state) => {
+    state.workspaceOutputActive[workspaceId] = active;
   }),
 
   // ─── Multiview ─────────────────────────────────────────────────────────

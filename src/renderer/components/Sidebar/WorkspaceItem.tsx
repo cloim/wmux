@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import type { AgentStatus, Workspace } from '../../../shared/types';
 import { useStore } from '../../stores';
 import { useT } from '../../hooks/useT';
-import { countUnreadForWorkspace } from '../../utils/workspaceUnread';
 
 interface WorkspaceItemProps {
   workspace: Workspace;
@@ -49,7 +48,7 @@ export default function WorkspaceItem({ workspace, isActive, isMultiview, index,
   const inputRef = useRef<HTMLInputElement>(null);
   const dragStartTimeRef = useRef<number>(0);
 
-  const unreadCount = useStore((s) => countUnreadForWorkspace(s.notifications, workspace.id));
+  const outputActive = useStore((s) => s.workspaceOutputActive[workspace.id] === true);
 
   const metadata = workspace.metadata;
 
@@ -153,7 +152,11 @@ export default function WorkspaceItem({ workspace, isActive, isMultiview, index,
         onDrop={handleDrop}
       >
         {/* Status indicator */}
-        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5 ${isActive ? 'bg-[var(--accent-green)]' : 'bg-[var(--text-muted)]'}`} />
+        {outputActive ? (
+          <div className="workspace-output-spinner flex-shrink-0 mt-0.5" />
+        ) : (
+          <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5 ${isActive ? 'bg-[var(--accent-green)]' : 'bg-[var(--text-muted)]'}`} />
+        )}
 
         {/* Name + Metadata */}
         <div className="flex-1 min-w-0">
@@ -176,11 +179,6 @@ export default function WorkspaceItem({ workspace, isActive, isMultiview, index,
                 <span className="text-[11px] font-mono truncate">{workspace.name}</span>
                 {metadata?.agentStatus && metadata.agentStatus !== 'idle' && (
                   <AgentStatusDot status={metadata.agentStatus} agentName={metadata.agentName} />
-                )}
-                {unreadCount > 0 && (
-                  <span className="bg-[var(--accent-blue)] text-[var(--bg-base)] text-[9px] font-bold min-w-[16px] h-4 flex items-center justify-center rounded-full px-1 flex-shrink-0">
-                    {unreadCount}
-                  </span>
                 )}
               </div>
             </>
