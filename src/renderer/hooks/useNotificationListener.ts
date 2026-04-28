@@ -122,6 +122,7 @@ export function useNotificationListener() {
       for (const ws of state.workspaces) {
         const found = findSurfaceByPtyId(ws.rootPane, ptyId);
         if (found) {
+          state.updateSurfaceCwdByPty(ptyId, cwd);
           state.updateWorkspaceMetadata(ws.id, { cwd });
           break;
         }
@@ -133,6 +134,9 @@ export function useNotificationListener() {
       for (const ws of state.workspaces) {
         const found = findSurfaceByPtyId(ws.rootPane, ptyId);
         if (found) {
+          if (data.cwd) {
+            state.updateSurfaceCwdByPty(ptyId, data.cwd);
+          }
           // Only update CWD from the active pane's active surface to prevent
           // stale PTYs from overwriting the current directory
           const isActiveSurface = isActivePtySurface(ws, ptyId);

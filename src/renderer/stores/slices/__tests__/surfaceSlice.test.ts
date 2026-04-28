@@ -23,6 +23,20 @@ function createHarness() {
 }
 
 describe('surfaceSlice browser partition state', () => {
+  it('updates the cwd for the terminal surface that owns the pty', () => {
+    const { state, slice } = createHarness();
+    const paneId = state.workspaces[0].rootPane.id;
+
+    slice.addSurface(paneId, 'pty-1', 'pwsh', 'D:\\PROJECTS\\wmux');
+    slice.addSurface(paneId, 'pty-2', 'pwsh', 'D:\\PROJECTS\\other');
+    slice.updateSurfaceCwdByPty('pty-1', 'D:\\PROJECTS\\wmux\\src');
+
+    const pane = state.workspaces[0].rootPane;
+    if (pane.type !== 'leaf') throw new Error('expected leaf pane');
+    expect(pane.surfaces.find((surface) => surface.ptyId === 'pty-1')?.cwd).toBe('D:\\PROJECTS\\wmux\\src');
+    expect(pane.surfaces.find((surface) => surface.ptyId === 'pty-2')?.cwd).toBe('D:\\PROJECTS\\other');
+  });
+
   it('stores the provided partition on new browser surfaces', () => {
     const { state, slice } = createHarness();
     const paneId = state.workspaces[0].rootPane.id;

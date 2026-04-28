@@ -12,6 +12,7 @@ export interface SurfaceSlice {
   nextSurface: (paneId: string) => void;
   prevSurface: (paneId: string) => void;
   updateSurfacePtyId: (paneId: string, surfaceId: string, ptyId: string) => void;
+  updateSurfaceCwdByPty: (ptyId: string, cwd: string) => void;
   updateSurfaceTitle: (surfaceId: string, title: string) => void;
   updateBrowserPartition: (partition: string, surfaceId?: string) => void;
 }
@@ -135,6 +136,23 @@ export const createSurfaceSlice: StateCreator<StoreState, [['zustand/immer', nev
         surface.ptyId = ptyId;
         return;
       }
+    }
+  }),
+
+  updateSurfaceCwdByPty: (ptyId, cwd) => set((state: StoreState) => {
+    for (const ws of state.workspaces) {
+      const updateInPane = (pane: Pane): boolean => {
+        if (pane.type === 'leaf') {
+          const surface = pane.surfaces.find((s) => s.ptyId === ptyId);
+          if (surface) {
+            surface.cwd = cwd;
+            return true;
+          }
+          return false;
+        }
+        return pane.children.some(updateInPane);
+      };
+      if (updateInPane(ws.rootPane)) return;
     }
   }),
 
