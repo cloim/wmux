@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import type { AgentStatus, Workspace } from '../../../shared/types';
 import { useStore } from '../../stores';
 import { useT } from '../../hooks/useT';
+import { shouldShowWorkspaceOutputActivity } from '../../utils/workspaceOutputActivity';
 
 interface WorkspaceItemProps {
   workspace: Workspace;
@@ -48,7 +49,13 @@ export default function WorkspaceItem({ workspace, isActive, isMultiview, index,
   const inputRef = useRef<HTMLInputElement>(null);
   const dragStartTimeRef = useRef<number>(0);
 
-  const outputActive = useStore((s) => s.workspaceOutputActive[workspace.id] === true);
+  const outputActive = useStore((s) =>
+    shouldShowWorkspaceOutputActivity(
+      workspace.id,
+      s.activeWorkspaceId,
+      s.workspaceOutputActive,
+    ),
+  );
 
   const metadata = workspace.metadata;
 
@@ -137,7 +144,7 @@ export default function WorkspaceItem({ workspace, isActive, isMultiview, index,
 
       <div
         draggable
-        className={`group flex items-start gap-2 px-3 py-1.5 cursor-pointer rounded-md transition-colors select-none ${
+        className={`group flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded-md transition-colors select-none ${
           isActive
             ? 'bg-[var(--bg-surface)] text-[var(--text-main)]'
             : 'text-[var(--text-subtle)] hover:bg-[rgba(var(--bg-surface-rgb),0.5)] hover:text-[var(--text-sub)]'
@@ -153,9 +160,9 @@ export default function WorkspaceItem({ workspace, isActive, isMultiview, index,
       >
         {/* Status indicator */}
         {outputActive ? (
-          <div className="workspace-output-spinner flex-shrink-0 mt-0.5" />
+          <div className="workspace-output-spinner flex-shrink-0" />
         ) : (
-          <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5 ${isActive ? 'bg-[var(--accent-green)]' : 'bg-[var(--text-muted)]'}`} />
+          <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActive ? 'bg-[var(--accent-green)]' : 'bg-[var(--text-muted)]'}`} />
         )}
 
         {/* Name + Metadata */}
@@ -186,13 +193,13 @@ export default function WorkspaceItem({ workspace, isActive, isMultiview, index,
         </div>
 
         {/* Shortcut hint */}
-        <span className="text-[8px] font-mono text-[var(--text-muted)] flex-shrink-0 mt-0.5">
+        <span className="text-[8px] font-mono text-[var(--text-muted)] flex-shrink-0">
           {index < 9 ? `^${index + 1}` : ''}
         </span>
 
         {/* Copy session info button */}
         <button
-          className="opacity-0 group-hover:opacity-100 text-[var(--text-subtle)] hover:text-[var(--accent-blue)] text-[10px] font-mono flex-shrink-0 mt-0.5 transition-opacity"
+          className="opacity-0 group-hover:opacity-100 text-[var(--text-subtle)] hover:text-[var(--accent-blue)] text-[10px] font-mono flex-shrink-0 transition-opacity"
           onClick={(e) => { e.stopPropagation(); onCopyInfo(); }}
           title={t('workspace.copyInfo')}
         >
@@ -201,7 +208,7 @@ export default function WorkspaceItem({ workspace, isActive, isMultiview, index,
 
         {/* Close button */}
         <button
-          className="opacity-0 group-hover:opacity-100 text-[var(--text-subtle)] hover:text-[var(--accent-red)] text-[10px] font-mono flex-shrink-0 mt-0.5 transition-opacity"
+          className="opacity-0 group-hover:opacity-100 text-[var(--text-subtle)] hover:text-[var(--accent-red)] text-[10px] font-mono flex-shrink-0 transition-opacity"
           onClick={(e) => { e.stopPropagation(); onClose(); }}
           title={t('workspace.close')}
         >

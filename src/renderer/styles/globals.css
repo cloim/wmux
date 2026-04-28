@@ -253,40 +253,56 @@ html, body, #root {
   animation: notification-ring-pulse 2s ease-in-out infinite;
 }
 
-@keyframes workspace-output-spin {
-  to { transform: rotate(360deg); }
+@keyframes workspace-output-lottie {
+  0%, 100% {
+    background-position: 50% 50%, 50% 50%, 50% 50%, 50% 50%;
+    transform: rotate(0deg);
+  }
+  28%, 72% {
+    background-position: 12% 12%, 88% 12%, 12% 88%, 88% 88%;
+  }
+  72% {
+    transform: rotate(-270deg);
+  }
 }
 
 .workspace-output-spinner {
   position: relative;
-  width: 10px;
-  height: 10px;
-  animation: workspace-output-spin 0.9s linear infinite;
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+}
+
+.workspace-output-spinner::before {
+  content: '';
+  position: absolute;
+  left: -4.7px;
+  top: -4.7px;
+  width: 15.4px;
+  height: 15.4px;
 }
 
 .workspace-output-spinner::before,
 .workspace-output-tile::after {
-  content: '';
-  position: absolute;
-  width: 2px;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--text-main);
-  box-shadow:
-    -4px 6px 0 var(--text-main),
-    4px 6px 0 var(--text-main);
-}
-
-.workspace-output-spinner::before {
-  left: 4px;
-  top: 1px;
+  background:
+    radial-gradient(circle, rgb(49 137 91) 0 2.4px, transparent 2.6px),
+    radial-gradient(circle, rgb(49 137 91) 0 2.4px, transparent 2.6px),
+    radial-gradient(circle, rgb(49 137 91) 0 2.4px, transparent 2.6px),
+    radial-gradient(circle, rgb(49 137 91) 0 2.4px, transparent 2.6px);
+  background-position: 50% 50%, 50% 50%, 50% 50%, 50% 50%;
+  background-repeat: no-repeat;
+  background-size: 4.8px 4.8px;
+  animation: workspace-output-lottie 1.35s cubic-bezier(0.333, 0, 0.667, 1) infinite;
 }
 
 .workspace-output-tile::after {
-  left: 6px;
-  top: 3px;
-  transform-origin: 1px 5px;
-  animation: workspace-output-spin 0.9s linear infinite;
+  content: '';
+  position: absolute;
+  right: 2.3px;
+  top: 2.3px;
+  width: 15.4px;
+  height: 15.4px;
+  background-size: 4.8px 4.8px;
 }
 
 /* Notification panel slide-in */

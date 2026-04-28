@@ -1,6 +1,7 @@
 import { useStore } from '../../stores';
 import { useT } from '../../hooks/useT';
 import { useState } from 'react';
+import { shouldShowWorkspaceOutputActivity } from '../../utils/workspaceOutputActivity';
 
 export default function MiniSidebar() {
   const t = useT();
@@ -53,7 +54,11 @@ export default function MiniSidebar() {
         {workspaces.map((ws, i) => {
           const isActive = ws.id === activeWorkspaceId;
           const initial = ws.name.charAt(0).toUpperCase();
-          const outputActive = workspaceOutputActive[ws.id] === true;
+          const outputActive = shouldShowWorkspaceOutputActivity(
+            ws.id,
+            activeWorkspaceId,
+            workspaceOutputActive,
+          );
 
           return (
             <div key={ws.id} className="relative">
