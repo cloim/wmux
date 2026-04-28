@@ -10,6 +10,7 @@ import { ProcessMonitor } from './ProcessMonitor';
 import { Watchdog } from './Watchdog';
 import type { DaemonState } from './types';
 import type { DaemonEvent, DaemonCreateSessionParams, DaemonSessionIdParams, DaemonResizeParams } from '../shared/rpc';
+import { writePtyInputWithWin32Fallback } from '../shared/win32ConsoleInput';
 
 // === Constants ===
 const wmuxDir = getWmuxDir();
@@ -504,7 +505,10 @@ function registerRpcHandlers(
 
       // Forward client input to PTY
       pipe.onInput((data: Buffer) => {
-        managed.ptyProcess.write(data.toString());
+        const text = data.toString();
+        writePtyInputWithWin32Fallback(managed.meta.pid, text, (input) => {
+          managed.ptyProcess.write(input);
+        });
       });
 
       try {

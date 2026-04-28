@@ -17,6 +17,10 @@ import * as path from 'path';
 // runs with continue-on-error.
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf-8')) as { version: string };
 const SQUIRREL_SETUP_EXE = `wmux-${pkg.version}.Setup.exe`;
+const extraResources = ['./dist/mcp-bundle', './dist/daemon-bundle', './assets/icon.ico', './THIRD_PARTY_NOTICES', './src/main/pty/shell-hooks'];
+if (fs.existsSync(path.join(__dirname, 'dist', 'native'))) {
+  extraResources.splice(2, 0, './dist/native');
+}
 
 function copyDirSync(src: string, dest: string): void {
   fs.mkdirSync(dest, { recursive: true });
@@ -34,7 +38,7 @@ const config: ForgeConfig = {
       unpack: '**/node_modules/node-pty/**',
     },
     icon: './assets/icon',
-    extraResource: ['./dist/mcp-bundle', './dist/daemon-bundle', './assets/icon.ico', './THIRD_PARTY_NOTICES', './src/main/pty/shell-hooks'],
+    extraResource: extraResources,
   },
   hooks: {
     postPackage: async (_config, packageResult) => {

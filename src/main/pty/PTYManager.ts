@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getPipeName, ENV_KEYS, getPidMapDir } from '../../shared/constants';
 import { buildSafeChildEnv } from '../../shared/envFilter';
+import { writePtyInputWithWin32Fallback } from '../../shared/win32ConsoleInput';
 
 export type ShellType = 'powershell' | 'bash' | 'cmd' | 'unknown';
 
@@ -179,7 +180,9 @@ export class PTYManager {
   write(id: string, data: string): void {
     const instance = this.instances.get(id);
     if (instance) {
-      instance.process.write(data);
+      writePtyInputWithWin32Fallback(instance.process.pid, data, (text) => {
+        instance.process.write(text);
+      });
     }
   }
 
