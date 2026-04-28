@@ -42,7 +42,7 @@ export function registerNotifyRpc(router: RpcRouter, getWindow: GetWindow): void
     const win = getWindow();
     if (win && !win.isDestroyed()) {
       // Push notification to the renderer notification store
-      win.webContents.send(IPC.NOTIFICATION, { title, body, type });
+      win.webContents.send(IPC.NOTIFICATION, null, { title, body, type });
     }
 
     // Show OS-level toast (only when window is not focused)

@@ -359,6 +359,7 @@ export const createUISlice: StateCreator<StoreState, [['zustand/immer', never]],
     window.electronAPI.settings.setToastEnabled(enabled);
     set((state) => {
       state.toastEnabled = enabled;
+      if (!enabled) state.toasts = [];
     });
   },
 

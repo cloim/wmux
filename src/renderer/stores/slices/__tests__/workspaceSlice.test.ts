@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { createWorkspaceSlice, type WorkspaceSlice } from '../workspaceSlice';
-import { createWorkspace, type Workspace } from '../../../../shared/types';
+import { createWorkspace, type Notification, type Workspace } from '../../../../shared/types';
 
 // Minimal store satisfying WorkspaceSlice + the pieces of UISlice the
 // setActiveWorkspace logic touches (multiviewIds). We don't pull in the
@@ -10,6 +10,7 @@ import { createWorkspace, type Workspace } from '../../../../shared/types';
 type TestState = WorkspaceSlice & {
   multiviewIds: string[];
   defaultCwd: string;
+  notifications: Notification[];
 };
 
 function createTestStore(initialWorkspaces: Workspace[], activeId: string, multiviewIds: string[] = []) {
@@ -24,6 +25,7 @@ function createTestStore(initialWorkspaces: Workspace[], activeId: string, multi
       activeWorkspaceId: activeId,
       multiviewIds,
       defaultCwd: '',
+      notifications: [],
     }))
   );
 }
@@ -91,6 +93,52 @@ describe('WorkspaceSlice.setActiveWorkspace', () => {
 
     expect(store.getState().activeWorkspaceId).toBe(wsB.id);
     expect(store.getState().multiviewIds).toEqual([]);
+  });
+
+  it('marks all unread notifications in the selected workspace as read', () => {
+    const store = createTestStore([wsA, wsB], wsA.id);
+    store.setState({
+      notifications: [
+        {
+          id: 'notif-a',
+          workspaceId: wsA.id,
+          surfaceId: 'surface-a',
+          type: 'agent',
+          title: 'A',
+          body: 'done',
+          timestamp: 1,
+          read: false,
+        },
+        {
+          id: 'notif-b1',
+          workspaceId: wsB.id,
+          surfaceId: 'surface-b1',
+          type: 'agent',
+          title: 'B1',
+          body: 'done',
+          timestamp: 2,
+          read: false,
+        },
+        {
+          id: 'notif-b2',
+          workspaceId: wsB.id,
+          surfaceId: 'surface-b2',
+          type: 'warning',
+          title: 'B2',
+          body: 'check',
+          timestamp: 3,
+          read: false,
+        },
+      ],
+    });
+
+    store.getState().setActiveWorkspace(wsB.id);
+
+    expect(store.getState().notifications).toEqual([
+      expect.objectContaining({ id: 'notif-a', read: false }),
+      expect.objectContaining({ id: 'notif-b1', read: true }),
+      expect.objectContaining({ id: 'notif-b2', read: true }),
+    ]);
   });
 
   it('ignores unknown ids without disturbing multiview', () => {

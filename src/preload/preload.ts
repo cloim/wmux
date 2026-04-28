@@ -40,8 +40,8 @@ const electronAPI = {
     setAutoUpdateEnabled: (enabled: boolean) => ipcRenderer.send(IPC.AUTO_UPDATE_ENABLED, enabled),
   },
   notification: {
-    onNew: (callback: (ptyId: string, data: { type: string; title: string; body: string }) => void) => {
-      const listener = (_event: Electron.IpcRendererEvent, ptyId: string, data: { type: string; title: string; body: string }) =>
+    onNew: (callback: (ptyId: string | null, data: { type: string; title: string; body: string }) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, ptyId: string | null, data: { type: string; title: string; body: string }) =>
         callback(ptyId, data);
       ipcRenderer.on(IPC.NOTIFICATION, listener);
       return () => { ipcRenderer.removeListener(IPC.NOTIFICATION, listener); };

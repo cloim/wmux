@@ -37,6 +37,7 @@ export const createToastSlice: StateCreator<StoreState, [['zustand/immer', never
   pushToast: (t) => {
     const id = generateId('toast');
     set((state: StoreState) => {
+      if (state.toastEnabled === false) return;
       state.toasts.push({ ...t, id });
       // Drop oldest if we exceed the cap.
       if (state.toasts.length > MAX_TOASTS) {

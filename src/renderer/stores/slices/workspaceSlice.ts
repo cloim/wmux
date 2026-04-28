@@ -95,6 +95,11 @@ export const createWorkspaceSlice: StateCreator<StoreState, [['zustand/immer', n
     setActiveWorkspace: (id) => set((state: StoreState) => {
       if (!state.workspaces.some((w: Workspace) => w.id === id)) return;
       state.activeWorkspaceId = id;
+      for (const notification of state.notifications) {
+        if (!notification.read && notification.workspaceId === id) {
+          notification.read = true;
+        }
+      }
       // If multiview is active and the user is switching to a workspace that
       // isn't part of it, exit multiview. Without this, the active ID updates
       // silently but the layout keeps rendering the multiview grid — the

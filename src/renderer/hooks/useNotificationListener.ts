@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from '../stores';
-import type { NotificationType, Pane, PaneLeaf } from '../../shared/types';
+import type { NotificationType, Pane, PaneLeaf, Workspace } from '../../shared/types';
 import { playNotificationSound } from './useNotificationSound';
 
 function findSurfaceByPtyId(root: Pane, ptyId: string): { surfaceId: string; paneId: string } | null {
@@ -13,6 +13,41 @@ function findSurfaceByPtyId(root: Pane, ptyId: string): { surfaceId: string; pan
     const found = findSurfaceByPtyId(child, ptyId);
     if (found) return found;
   }
+  return null;
+}
+
+function findActiveSurface(root: Pane, activePaneId: string): { surfaceId: string; paneId: string } | null {
+  if (root.type === 'leaf') {
+    if (root.id !== activePaneId) return null;
+    const surface = root.surfaces.find((s) => s.id === root.activeSurfaceId) ?? root.surfaces[0];
+    return surface ? { surfaceId: surface.id, paneId: root.id } : null;
+  }
+  for (const child of root.children) {
+    const found = findActiveSurface(child, activePaneId);
+    if (found) return found;
+  }
+  return null;
+}
+
+export function resolveNotificationTarget(
+  workspaces: Workspace[],
+  activeWorkspaceId: string,
+  ptyId: string | null,
+): { workspaceId: string; surfaceId: string } | null {
+  if (ptyId) {
+    for (const ws of workspaces) {
+      const found = findSurfaceByPtyId(ws.rootPane, ptyId);
+      if (found) return { workspaceId: ws.id, surfaceId: found.surfaceId };
+    }
+    return null;
+  }
+
+  const activeWorkspace = workspaces.find((ws) => ws.id === activeWorkspaceId) ?? workspaces[0];
+  if (!activeWorkspace) return null;
+
+  const found = findActiveSurface(activeWorkspace.rootPane, activeWorkspace.activePaneId);
+  if (found) return { workspaceId: activeWorkspace.id, surfaceId: found.surfaceId };
+
   return null;
 }
 
@@ -36,31 +71,48 @@ function isActivePtySurface(ws: { rootPane: Pane; activePaneId: string }, ptyId:
 const lastSoundTime: Record<string, number> = {};
 const SOUND_THROTTLE_MS = 2000;
 
+function notificationToastLevel(type: NotificationType): 'info' | 'warn' | 'error' {
+  switch (type) {
+    case 'error':
+      return 'error';
+    case 'warning':
+      return 'warn';
+    case 'agent':
+    case 'info':
+    default:
+      return 'info';
+  }
+}
+
 export function useNotificationListener() {
   useEffect(() => {
     const unsubNotif = window.electronAPI.notification.onNew((ptyId, data) => {
       const state = useStore.getState();
-      // Find which workspace/surface this ptyId belongs to
-      for (const ws of state.workspaces) {
-        const found = findSurfaceByPtyId(ws.rootPane, ptyId);
-        if (found) {
-          state.addNotification({
-            surfaceId: found.surfaceId,
-            workspaceId: ws.id,
-            type: data.type as NotificationType,
-            title: data.title,
-            body: data.body,
-          });
-          // Play sound if enabled (throttled)
-          if (useStore.getState().notificationSoundEnabled) {
-            const now = Date.now();
-            const key = data.type;
-            if (!lastSoundTime[key] || now - lastSoundTime[key] > SOUND_THROTTLE_MS) {
-              lastSoundTime[key] = now;
-              playNotificationSound(data.type as NotificationType);
-            }
-          }
-          break;
+      const target = resolveNotificationTarget(state.workspaces, state.activeWorkspaceId, ptyId);
+      if (!target) return;
+
+      const type = data.type as NotificationType;
+      state.addNotification({
+        surfaceId: target.surfaceId,
+        workspaceId: target.workspaceId,
+        type,
+        title: data.title,
+        body: data.body,
+      });
+      if (useStore.getState().toastEnabled) {
+        const message = data.body ? `${data.title}: ${data.body}` : data.title;
+        useStore.getState().pushToast({
+          message,
+          level: notificationToastLevel(type),
+        });
+      }
+      // Play sound if enabled (throttled)
+      if (useStore.getState().notificationSoundEnabled) {
+        const now = Date.now();
+        const key = data.type;
+        if (!lastSoundTime[key] || now - lastSoundTime[key] > SOUND_THROTTLE_MS) {
+          lastSoundTime[key] = now;
+          playNotificationSound(data.type as NotificationType);
         }
       }
     });
