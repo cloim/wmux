@@ -13,6 +13,12 @@ import { XTERM_THEMES, extractXtermColors, type ThemeId, type BuiltinThemeId } f
 const terminalRegistry = new Map<string, Terminal>();
 export { terminalRegistry };
 
+export function hasVisibleTerminalSize(
+  container: Pick<HTMLElement, 'offsetWidth' | 'offsetHeight'> | null | undefined,
+): boolean {
+  return !!container && container.offsetWidth > 0 && container.offsetHeight > 0;
+}
+
 // Lightweight copy feedback toast — injects/removes a DOM element
 let copyToastTimer: ReturnType<typeof setTimeout> | null = null;
 function showCopyToast() {
@@ -81,7 +87,7 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
     // Guard: skip fit entirely when the container is hidden (zero dimensions).
     // Calling fit() on a display:none element produces 0 cols/rows which
     // corrupts the xterm buffer and causes the "infinite copy downward" bug.
-    if (container.offsetWidth === 0 || container.offsetHeight === 0) return;
+    if (!hasVisibleTerminalSize(container)) return;
     try {
       fitAddonRef.current.fit();
       const currentPtyId = ptyIdRef.current;
@@ -159,7 +165,7 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
     // If the workspace starts hidden (display:none), skip the initial fit so we
     // don't corrupt the terminal with 0 cols/rows. The visibility-watcher effect
     // below will trigger a proper fit when the workspace is shown.
-    if (container.offsetWidth > 0 && container.offsetHeight > 0) {
+    if (hasVisibleTerminalSize(container)) {
       fitAddon.fit();
     }
 
@@ -170,7 +176,7 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
     // recreate the WebGL addon to force a full atlas rebuild.
     document.fonts.ready.then(() => {
       if (!terminalRef.current || terminalRef.current !== terminal) return;
-      if (container.offsetWidth === 0 || container.offsetHeight === 0) return;
+      if (!hasVisibleTerminalSize(container)) return;
       if (webglAddonRef.current) {
         webglAddonRef.current.dispose();
         webglAddonRef.current = null;
@@ -518,7 +524,7 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
             const term = terminalRef.current;
             if (!term) return;
 
-            if (container.offsetWidth === 0 || container.offsetHeight === 0) return;
+            if (!hasVisibleTerminalSize(container)) return;
 
             const prevYBase = term.buffer.active.baseY;
             const prevYDisp = term.buffer.active.viewportY;
@@ -571,8 +577,8 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
     terminalRef.current.options.fontSize = terminalFontSize;
     terminalRef.current.options.fontFamily = `'${terminalFontFamily}', 'Consolas', 'Courier New', 'Malgun Gothic', monospace`;
     terminalRef.current.options.theme = xtermTheme;
-    fitAddonRef.current?.fit();
-  }, [terminalFontSize, terminalFontFamily, xtermTheme]);
+    fit();
+  }, [terminalFontSize, terminalFontFamily, xtermTheme, fit]);
 
   // Manage WebGL lifecycle based on visibility.
   // Load WebGL when visible (GPU-accelerated rendering), dispose when hidden
