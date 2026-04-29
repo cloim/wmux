@@ -250,6 +250,14 @@ describe('DaemonSessionManager', () => {
     expect(stored).toBe('hello world');
   });
 
+  it('updates session cwd when PowerShell hook reports OSC 7 after cd', () => {
+    manager.createSession({ id: 'cwd-osc', cmd: 'pwsh.exe', cwd: 'D:\\PROJECTS\\wmux' });
+
+    lastMockPty?.simulateData('\x1b]7;file://MYPC/D:/PROJECTS/wmux/src\x07');
+
+    expect(manager.getSession('cwd-osc')?.meta.cwd).toBe('D:\\PROJECTS\\wmux\\src');
+  });
+
   // Agent metadata on session
   it('stores agent metadata when provided', () => {
     const session = manager.createSession({

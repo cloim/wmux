@@ -18,7 +18,7 @@ import { getWmuxDir } from './config';
  *   - zsh / fish           (v3 roadmap)
  */
 
-const INTEGRATION_VERSION = 3;
+const INTEGRATION_VERSION = 5;
 const VERSION_FILE = '.version';
 
 // -----------------------------------------------------------------------
@@ -62,10 +62,20 @@ function global:prompt {
 
     $esc = [char]27
     $bel = [char]7
+    $cwdOsc = ''
+    try {
+        $cwd = (Get-Location).ProviderPath
+        $hostName = $env:COMPUTERNAME
+        $cwdUri = 'file://' + $hostName + '/' + ($cwd -replace '\\\\', '/')
+        $cwdOsc = "$esc]7;$cwdUri$bel"
+    } catch {
+        # CWD reporting is best-effort; keep OSC 133 prompt markers alive.
+    }
 
     # D;<exit>  marks end of previous command.
     # A         marks start of the new prompt.
-    $pre = "$esc]133;D;$ec$bel$esc]133;A$bel"
+    # OSC 7    reports the current working directory for tab/workspace metadata.
+    $pre = "$esc]133;D;$ec$bel$esc]133;A$bel$cwdOsc"
 
     $body = if ($global:__wmux_prev_prompt) {
         try { & $global:__wmux_prev_prompt } catch { "PS $($executionContext.SessionState.Path.CurrentLocation)> " }
@@ -136,7 +146,11 @@ __wmux_preexec() {
 
 __wmux_precmd() {
   __wmux_last_exit=\$?
-  printf '\\033]133;D;%d\\a\\033]133;A\\a' "\$__wmux_last_exit"
+  __wmux_cwd="\$PWD"
+  if [ -n "\${WSL_DISTRO_NAME:-}" ] && command -v wslpath >/dev/null 2>&1; then
+    __wmux_cwd="\$(wslpath -w "\$PWD" 2>/dev/null | sed 's|\\\\|/|g')"
+  fi
+  printf '\\033]133;D;%d\\a\\033]133;A\\a\\033]7;file://%s/%s\\a' "\$__wmux_last_exit" "\${HOSTNAME:-localhost}" "\$__wmux_cwd"
 }
 
 # PS0 runs after Enter, before the command executes (bash 4.4+).
