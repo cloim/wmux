@@ -26,7 +26,7 @@ import type { SessionData, PaneLeaf, Pane, Surface } from '../../../shared/types
 import { Terminal } from '@xterm/xterm';
 import { terminalRegistry } from '../../hooks/useTerminal';
 import { withDefaultPtyOptions } from '../../utils/ptyCreateOptions';
-import { resolveRestoredSurfaceCwd } from '../../utils/restoreCwd';
+import { resolveEmptyLeafCwd, resolveRestoredSurfaceCwd } from '../../utils/restoreCwd';
 import { isFileDrag } from '../../../shared/dragDrop';
 
 /** Map shell executable path to a human-readable display name. */
@@ -399,8 +399,9 @@ export default function AppLayout() {
 
     for (const leaf of emptyLeaves) {
       const paneId = leaf.id;
+      const cwd = resolveEmptyLeafCwd(activeWorkspace.rootPane, paneId, activeWorkspace.metadata?.cwd);
       window.electronAPI.pty.create(
-        withDefaultPtyOptions({ workspaceId: wsId }, useStore.getState().defaultShell, useStore.getState().defaultCwd)
+        withDefaultPtyOptions({ cwd, workspaceId: wsId }, useStore.getState().defaultShell, useStore.getState().defaultCwd)
       ).then((result: { id: string; shell?: string; cwd?: string }) => {
         if (cancelled) {
           window.electronAPI.pty.dispose(result.id);
@@ -419,7 +420,7 @@ export default function AppLayout() {
     }
 
     return () => { cancelled = true; };
-  }, [activeWorkspace?.id]);
+  }, [activeWorkspace?.id, activeWorkspace?.rootPane, activeWorkspace?.metadata?.cwd, addSurface]);
 
   if (!activeWorkspace) return null;
 
