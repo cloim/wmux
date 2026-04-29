@@ -29,6 +29,8 @@ import { Terminal } from '@xterm/xterm';
 import { terminalRegistry } from '../../hooks/useTerminal';
 import { withDefaultPtyOptions } from '../../utils/ptyCreateOptions';
 import { resolveEmptyLeafCwd, resolveRestoredSurfaceCwd } from '../../utils/restoreCwd';
+import { collectEmptyLeavesForInitialSurfaceRestore, shouldReconcileOnDaemonConnected } from '../../utils/startupRestore';
+import { collectPtyReconcileTasks, collectStaleActivePtyIds, runWithConcurrency } from '../../utils/reconcilePtys';
 import { isFileDrag } from '../../../shared/dragDrop';
 
 /** Map shell executable path to a human-readable display name. */
@@ -194,6 +196,7 @@ export default function AppLayout() {
   const [isDragging, setIsDragging] = useState(false);
   const dragCounterRef = useRef(0);
   const sessionLoadedRef = useRef(false);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
 
   useEffect(() => {
     // File drop via preload onFileDrop (reliable cross-platform)
@@ -266,45 +269,41 @@ export default function AppLayout() {
       console.log('[AppLayout] Daemon active PTYs:', [...activeIds]);
 
       const state = useStore.getState();
-      const reconcile = async (pane: Pane, wsId: string, workspaceCwd?: string) => {
-        if (pane.type === 'leaf') {
-          for (const surface of pane.surfaces) {
-            if (surface.surfaceType === 'browser' || surface.surfaceType === 'editor') continue;
-            if (!surface.ptyId) {
-              console.log(`[AppLayout] Surface ${surface.id}: no ptyId, will create new`);
-              continue;
-            }
-            if (activeIds.has(surface.ptyId)) {
-              console.log(`[AppLayout] Surface ${surface.id}: reconnecting to ${surface.ptyId}`);
-              const result = await window.electronAPI.pty.reconnect(surface.ptyId);
-              console.log(`[AppLayout] Reconnect result:`, result);
-              if (!result.success) {
-                console.warn(`[AppLayout] Reconnect failed, clearing ptyId`);
-                useStore.getState().updateSurfacePtyId(pane.id, surface.id, '');
-              }
-            } else {
-              console.log(`[AppLayout] Surface ${surface.id}: ptyId ${surface.ptyId} not in daemon, creating new PTY`);
-              try {
-                const cwd = resolveRestoredSurfaceCwd(surface.cwd, workspaceCwd);
-                const newPty = await window.electronAPI.pty.create(
-                  withDefaultPtyOptions({ cwd, workspaceId: wsId }, useStore.getState().defaultShell, useStore.getState().defaultCwd)
-                );
-                useStore.getState().updateSurfacePtyId(pane.id, surface.id, newPty.id);
-              } catch (err) {
-                console.error(`[AppLayout] Failed to create replacement PTY:`, err);
-                useStore.getState().updateSurfacePtyId(pane.id, surface.id, '');
-              }
-            }
-          }
-        } else {
-          for (const child of pane.children) await reconcile(child, wsId, workspaceCwd);
-        }
-      };
+      const additionalReferencedPtyIds = state.floatingPanePtyId ? [state.floatingPanePtyId] : [];
+      const stalePtyIds = collectStaleActivePtyIds(state.workspaces, activePtys, additionalReferencedPtyIds);
+      await runWithConcurrency(stalePtyIds, 4, async (ptyId) => {
+        console.log(`[AppLayout] Disposing stale daemon PTY ${ptyId}`);
+        await window.electronAPI.pty.dispose(ptyId);
+        activeIds.delete(ptyId);
+      });
 
-      for (const ws of state.workspaces) {
-        console.log(`[AppLayout] Reconciling workspace: ${ws.name}`);
-        await reconcile(ws.rootPane, ws.id, ws.metadata?.cwd);
-      }
+      const tasks = collectPtyReconcileTasks(useStore.getState().workspaces);
+
+      await runWithConcurrency(tasks, 4, async (task) => {
+        if (activeIds.has(task.ptyId)) {
+          console.log(`[AppLayout] Surface ${task.surfaceId}: reconnecting to ${task.ptyId}`);
+          const result = await window.electronAPI.pty.reconnect(task.ptyId);
+          console.log(`[AppLayout] Reconnect result:`, result);
+          if (!result.success) {
+            console.warn(`[AppLayout] Reconnect failed, clearing ptyId`);
+            useStore.getState().updateSurfacePtyId(task.paneId, task.surfaceId, '');
+          }
+          return;
+        }
+
+        console.log(`[AppLayout] Surface ${task.surfaceId}: ptyId ${task.ptyId} not in daemon, creating new PTY`);
+        try {
+          const cwd = resolveRestoredSurfaceCwd(task.surfaceCwd, task.workspaceCwd);
+          const newPty = await window.electronAPI.pty.create(
+            withDefaultPtyOptions({ cwd, workspaceId: task.workspaceId }, useStore.getState().defaultShell, useStore.getState().defaultCwd)
+          );
+          useStore.getState().updateSurfacePtyId(task.paneId, task.surfaceId, newPty.id);
+        } catch (err) {
+          console.error(`[AppLayout] Failed to create replacement PTY:`, err);
+          useStore.getState().updateSurfacePtyId(task.paneId, task.surfaceId, '');
+        }
+      });
+
       console.log('[AppLayout] Reconciliation complete');
     } catch (err) {
       console.error('[AppLayout] PTY reconciliation failed:', err);
@@ -316,6 +315,7 @@ export default function AppLayout() {
     window.electronAPI.session.load().then(async (saved: SessionData | null) => {
       if (!saved) {
         sessionLoadedRef.current = true;
+        setSessionLoaded(true);
         // First ever launch — ask about auto-update
         setShowAutoUpdatePrompt(true);
         return;
@@ -326,6 +326,7 @@ export default function AppLayout() {
 
       useStore.getState().loadSession(saved);
       sessionLoadedRef.current = true;
+      setSessionLoaded(true);
 
       if (isFirstAutoUpdateChoice) {
         setShowAutoUpdatePrompt(true);
@@ -348,6 +349,7 @@ export default function AppLayout() {
   // before main process finished connecting to daemon).
   useEffect(() => {
     const remove = window.electronAPI.daemon.onConnected(() => {
+      if (!shouldReconcileOnDaemonConnected(sessionLoadedRef.current)) return;
       console.log('[AppLayout] Daemon connected late — re-reconciling PTYs');
       reconcilePtys();
     });
@@ -385,16 +387,7 @@ export default function AppLayout() {
   useEffect(() => {
     if (!activeWorkspace) return;
 
-    // Collect all empty leaf panes from the tree
-    type LeafPane = import('../../../shared/types').PaneLeaf;
-    const collectEmptyLeaves = (pane: import('../../../shared/types').Pane): LeafPane[] => {
-      if (pane.type === 'leaf') {
-        return pane.surfaces.length === 0 ? [pane] : [];
-      }
-      return pane.children.flatMap(collectEmptyLeaves);
-    };
-
-    const emptyLeaves = collectEmptyLeaves(activeWorkspace.rootPane);
+    const emptyLeaves = collectEmptyLeavesForInitialSurfaceRestore(sessionLoaded, activeWorkspace.rootPane);
     if (emptyLeaves.length === 0) return;
 
     let cancelled = false;
@@ -423,7 +416,7 @@ export default function AppLayout() {
     }
 
     return () => { cancelled = true; };
-  }, [activeWorkspace?.id, activeWorkspace?.rootPane, activeWorkspace?.metadata?.cwd, addSurface]);
+  }, [sessionLoaded, activeWorkspace?.id, activeWorkspace?.rootPane, activeWorkspace?.metadata?.cwd, addSurface]);
 
   if (!activeWorkspace) return null;
 
