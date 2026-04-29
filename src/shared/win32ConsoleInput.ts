@@ -5,7 +5,20 @@ import path from 'node:path';
 const HELPER_EXE = 'wmux-console-input.exe';
 const BRACKETED_PASTE_PREFIX = '\x1b[200~';
 const BRACKETED_PASTE_SUFFIX = '\x1b[201~';
+const SHIFT_ENTER_KEY_EVENT = '\x1b[13;2u';
 const MAX_NATIVE_INPUT_LENGTH = 4096;
+
+export type Win32NativeInput =
+  | { kind: 'text'; text: string }
+  | { kind: 'shiftEnter' };
+
+export function getWin32NativeInput(data: string): Win32NativeInput | null {
+  if (process.platform !== 'win32') return null;
+  if (data === SHIFT_ENTER_KEY_EVENT) return { kind: 'shiftEnter' };
+
+  const text = getWin32NativeInputText(data);
+  return text ? { kind: 'text', text } : null;
+}
 
 export function getWin32NativeInputText(data: string): string | null {
   if (process.platform !== 'win32') return null;
@@ -23,27 +36,31 @@ export function writePtyInputWithWin32Fallback(
   data: string,
   writePty: (data: string) => void,
 ): void {
-  const nativeText = getWin32NativeInputText(data);
-  if (nativeText && tryWriteWin32ConsoleInput(pid, nativeText)) {
+  const nativeInput = getWin32NativeInput(data);
+  if (nativeInput && tryWriteWin32ConsoleInput(pid, nativeInput)) {
     return;
   }
   writePty(data);
 }
 
-export function tryWriteWin32ConsoleInput(pid: number, text: string): boolean {
+export function tryWriteWin32ConsoleInput(pid: number, input: Win32NativeInput): boolean {
   if (process.platform !== 'win32') return false;
   if (!Number.isInteger(pid) || pid <= 0) return false;
 
   const helper = resolveWin32ConsoleInputHelper();
   if (!helper) return false;
 
+  const args = input.kind === 'shiftEnter'
+    ? ['--pid', String(pid), '--shift-enter']
+    : [
+        '--pid',
+        String(pid),
+        '--utf16-base64',
+        Buffer.from(input.text, 'utf16le').toString('base64'),
+      ];
+
   try {
-    execFileSync(helper, [
-      '--pid',
-      String(pid),
-      '--utf16-base64',
-      Buffer.from(text, 'utf16le').toString('base64'),
-    ], {
+    execFileSync(helper, args, {
       windowsHide: true,
       stdio: 'ignore',
       timeout: 2000,

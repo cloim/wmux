@@ -14,6 +14,7 @@ internal static class WmuxConsoleInput
     private const ushort VK_RETURN = 0x0D;
     private const ushort VK_TAB = 0x09;
     private const ushort VK_PACKET = 0xE7;
+    private const uint SHIFT_PRESSED = 0x0010;
     private static readonly IntPtr INVALID_HANDLE_VALUE = new IntPtr(-1);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -70,6 +71,7 @@ internal static class WmuxConsoleInput
         {
             var pid = 0U;
             string payload = null;
+            var shiftEnter = false;
 
             for (var i = 0; i < args.Length; i++)
             {
@@ -81,16 +83,20 @@ internal static class WmuxConsoleInput
                 {
                     payload = args[++i];
                 }
+                else if (args[i] == "--shift-enter")
+                {
+                    shiftEnter = true;
+                }
             }
 
-            if (pid == 0 || String.IsNullOrEmpty(payload))
+            if (pid == 0 || (!shiftEnter && String.IsNullOrEmpty(payload)))
             {
-                Console.Error.WriteLine("Usage: wmux-console-input.exe --pid <pid> --utf16-base64 <text>");
+                Console.Error.WriteLine("Usage: wmux-console-input.exe --pid <pid> (--utf16-base64 <text> | --shift-enter)");
                 return 2;
             }
 
-            var text = Encoding.Unicode.GetString(Convert.FromBase64String(payload));
-            if (text.Length == 0)
+            var text = shiftEnter ? null : Encoding.Unicode.GetString(Convert.FromBase64String(payload));
+            if (!shiftEnter && text.Length == 0)
             {
                 return 0;
             }
@@ -117,17 +123,13 @@ internal static class WmuxConsoleInput
 
             try
             {
-                foreach (var batch in BuildBatches(text, 128))
+                if (shiftEnter)
                 {
-                    uint written;
-                    if (!WriteConsoleInputW(input, batch, (uint)batch.Length, out written))
-                    {
-                        throw new Win32Exception(Marshal.GetLastWin32Error(), "WriteConsoleInput failed");
-                    }
-                    if (written != batch.Length)
-                    {
-                        throw new InvalidOperationException("WriteConsoleInput wrote fewer records than requested");
-                    }
+                    WriteBatch(input, BuildShiftEnter());
+                }
+                else foreach (var batch in BuildBatches(text, 128))
+                {
+                    WriteBatch(input, batch);
                 }
             }
             finally
@@ -142,6 +144,27 @@ internal static class WmuxConsoleInput
             Console.Error.WriteLine(ex.Message);
             return 1;
         }
+    }
+
+    private static void WriteBatch(IntPtr input, INPUT_RECORD[] batch)
+    {
+        uint written;
+        if (!WriteConsoleInputW(input, batch, (uint)batch.Length, out written))
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "WriteConsoleInput failed");
+        }
+        if (written != batch.Length)
+        {
+            throw new InvalidOperationException("WriteConsoleInput wrote fewer records than requested");
+        }
+    }
+
+    private static INPUT_RECORD[] BuildShiftEnter()
+    {
+        var records = new List<INPUT_RECORD>(2);
+        AddKey(records, '\r', true, SHIFT_PRESSED);
+        AddKey(records, '\r', false, SHIFT_PRESSED);
+        return records.ToArray();
     }
 
     private static IEnumerable<INPUT_RECORD[]> BuildBatches(string text, int charsPerBatch)
@@ -160,8 +183,8 @@ internal static class WmuxConsoleInput
                 ch = '\r';
             }
 
-            AddKey(records, ch, true);
-            AddKey(records, ch, false);
+            AddKey(records, ch, true, 0);
+            AddKey(records, ch, false, 0);
 
             if (records.Count >= charsPerBatch * 2)
             {
@@ -176,7 +199,7 @@ internal static class WmuxConsoleInput
         }
     }
 
-    private static void AddKey(List<INPUT_RECORD> records, char ch, bool keyDown)
+    private static void AddKey(List<INPUT_RECORD> records, char ch, bool keyDown, uint controlKeyState)
     {
         records.Add(new INPUT_RECORD
         {
@@ -188,7 +211,7 @@ internal static class WmuxConsoleInput
                 wVirtualKeyCode = VirtualKeyFor(ch),
                 wVirtualScanCode = 0,
                 UnicodeChar = ch,
-                dwControlKeyState = 0,
+                dwControlKeyState = controlKeyState,
             },
         });
     }

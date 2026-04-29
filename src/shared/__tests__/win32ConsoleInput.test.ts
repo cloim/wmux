@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getWin32NativeInputText } from '../win32ConsoleInput';
+import { getWin32NativeInput, getWin32NativeInputText } from '../win32ConsoleInput';
 
 const describeWin32 = process.platform === 'win32' ? describe : describe.skip;
 
@@ -15,5 +15,9 @@ describeWin32('getWin32NativeInputText', () => {
   it('keeps ASCII and ANSI control sequences on the normal PTY path', () => {
     expect(getWin32NativeInputText('abcdef')).toBeNull();
     expect(getWin32NativeInputText('\x1b[C')).toBeNull();
+  });
+
+  it('routes the Shift+Enter sentinel through native console key input', () => {
+    expect(getWin32NativeInput('\x1b[13;2u')).toEqual({ kind: 'shiftEnter' });
   });
 });

@@ -8,7 +8,14 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { useStore } from '../stores';
 import { t } from '../i18n';
 import { XTERM_THEMES, extractXtermColors, type ThemeId, type BuiltinThemeId } from '../themes';
-import { getShiftEnterInput } from '../utils/terminalInput';
+import {
+  createDeferredShiftEnterState,
+  getShiftEnterInput,
+  isShiftEnterKeyEvent,
+  processDeferredShiftEnterData,
+  shouldDeferShiftEnterUntilComposition,
+  shouldHandleShiftEnter,
+} from '../utils/terminalInput';
 
 // Module-level terminal registry for scrollback persistence
 const terminalRegistry = new Map<string, Terminal>();
@@ -191,16 +198,59 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
     let lastSentCols = 0;
     let lastSentRows = 0;
     let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let pendingShiftEnterAfterComposition = false;
+    let pendingShiftEnterCompositionEnded = false;
+    let pendingShiftEnterState = createDeferredShiftEnterState();
+    let suppressShiftEnterUntilKeyup = false;
+    const writeShiftEnterInput = () => {
+      window.electronAPI.pty.write(ptyId, getShiftEnterInput());
+    };
+    const clearPendingShiftEnter = () => {
+      pendingShiftEnterAfterComposition = false;
+      pendingShiftEnterCompositionEnded = false;
+      pendingShiftEnterState = createDeferredShiftEnterState();
+    };
+    const writePendingShiftEnterIfReady = () => {
+      if (!pendingShiftEnterAfterComposition) return;
+      if (pendingShiftEnterCompositionEnded && pendingShiftEnterState.textWritten) {
+        clearPendingShiftEnter();
+        writeShiftEnterInput();
+      }
+    };
+    const textarea = (terminal as Terminal & { textarea?: HTMLTextAreaElement }).textarea;
+    const markPendingShiftEnterCompositionEnded = () => {
+      pendingShiftEnterCompositionEnded = true;
+      writePendingShiftEnterIfReady();
+    };
+    textarea?.addEventListener('compositionend', markPendingShiftEnterCompositionEnded);
 
     // Clipboard + shortcut handling
     terminal.attachCustomKeyEventHandler((e) => {
+      if (e.type === 'keyup') {
+        if (suppressShiftEnterUntilKeyup && isShiftEnterKeyEvent(e)) {
+          suppressShiftEnterUntilKeyup = false;
+          return false;
+        }
+        return true;
+      }
       if (e.type !== 'keydown') return true;
 
-      // Shift+Enter inserts a prompt newline without submitting. Bracketed
-      // paste works for Codex and for shells like PSReadLine-backed PowerShell.
-      if (e.key === 'Enter' && e.shiftKey && !e.ctrlKey && !e.altKey) {
+      // Shift+Enter inserts a prompt newline without submitting. On Windows,
+      // the PTY layer turns this sentinel into a native Shift+Enter key event.
+      if (shouldDeferShiftEnterUntilComposition(e)) {
+        pendingShiftEnterAfterComposition = true;
+        pendingShiftEnterCompositionEnded = false;
+        pendingShiftEnterState = createDeferredShiftEnterState();
+        suppressShiftEnterUntilKeyup = true;
+        return true;
+      }
+      if (suppressShiftEnterUntilKeyup && shouldHandleShiftEnter(e)) {
         e.preventDefault();
-        window.electronAPI.pty.write(ptyId, getShiftEnterInput());
+        return false;
+      }
+      if (shouldHandleShiftEnter(e)) {
+        e.preventDefault();
+        writeShiftEnterInput();
         return false;
       }
 
@@ -401,6 +451,23 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
     // Forward user input to PTY and track commands for palette history
     let inputBuffer = '';
     terminal.onData((data) => {
+      if (pendingShiftEnterAfterComposition) {
+        const result = processDeferredShiftEnterData(data, pendingShiftEnterState, pendingShiftEnterCompositionEnded);
+        pendingShiftEnterState = result.nextState;
+
+        if (result.textToWrite) {
+          window.electronAPI.pty.write(ptyId, result.textToWrite);
+          inputBuffer += result.textToWrite;
+        }
+
+        if (result.shouldWriteShiftEnter) {
+          clearPendingShiftEnter();
+          writeShiftEnterInput();
+        }
+
+        return;
+      }
+
       window.electronAPI.pty.write(ptyId, data);
 
       if (data === '\r' || data === '\n') {
@@ -557,6 +624,7 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
 
     return () => {
       if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer);
+      textarea?.removeEventListener('compositionend', markPendingShiftEnterCompositionEnded);
       resizeObserver.disconnect();
       removeDataListener?.();
       removeExitListener?.();
