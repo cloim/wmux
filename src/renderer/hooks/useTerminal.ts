@@ -8,6 +8,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { useStore } from '../stores';
 import { t } from '../i18n';
 import { XTERM_THEMES, extractXtermColors, type ThemeId, type BuiltinThemeId } from '../themes';
+import { getShiftEnterInput } from '../utils/terminalInput';
 
 // Module-level terminal registry for scrollback persistence
 const terminalRegistry = new Map<string, Terminal>();
@@ -195,11 +196,11 @@ export function useTerminal(containerRef: React.RefObject<HTMLDivElement | null>
     terminal.attachCustomKeyEventHandler((e) => {
       if (e.type !== 'keydown') return true;
 
-      // Shift+Enter → send CSI u sequence so Claude Code inserts a newline
-      // instead of submitting. Kitty keyboard protocol: ESC [ 13 ; 2 u
+      // Shift+Enter inserts a prompt newline without submitting. Bracketed
+      // paste works for Codex and for shells like PSReadLine-backed PowerShell.
       if (e.key === 'Enter' && e.shiftKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
-        window.electronAPI.pty.write(ptyId, '\x1b[13;2u');
+        window.electronAPI.pty.write(ptyId, getShiftEnterInput());
         return false;
       }
 
