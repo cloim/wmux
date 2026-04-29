@@ -25,4 +25,16 @@ describe('UISlice workspace output activity', () => {
       'ws-b': true,
     });
   });
+
+  it('tracks renderer window focus state', () => {
+    const store = createTestStore();
+
+    expect(store.getState().isWindowFocused).toBe(true);
+
+    store.getState().setWindowFocused(false);
+    expect(store.getState().isWindowFocused).toBe(false);
+
+    store.getState().setWindowFocused(true);
+    expect(store.getState().isWindowFocused).toBe(true);
+  });
 });

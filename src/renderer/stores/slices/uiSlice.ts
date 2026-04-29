@@ -79,6 +79,9 @@ export interface UISlice {
   notificationRingEnabled: boolean;
   setNotificationRingEnabled: (enabled: boolean) => void;
 
+  isWindowFocused: boolean;
+  setWindowFocused: (focused: boolean) => void;
+
   workspaceOutputActive: Record<string, boolean>;
   setWorkspaceOutputActive: (workspaceId: string, active: boolean) => void;
 
@@ -370,6 +373,12 @@ export const createUISlice: StateCreator<StoreState, [['zustand/immer', never]],
 
   setNotificationRingEnabled: (enabled) => set((state) => {
     state.notificationRingEnabled = enabled;
+  }),
+
+  isWindowFocused: true,
+
+  setWindowFocused: (focused) => set((state) => {
+    state.isWindowFocused = focused;
   }),
 
   workspaceOutputActive: {},
