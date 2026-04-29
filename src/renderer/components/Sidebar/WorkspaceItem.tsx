@@ -54,6 +54,7 @@ export default function WorkspaceItem({ workspace, isActive, isMultiview, index,
       workspace.id,
       s.activeWorkspaceId,
       s.workspaceOutputActive,
+      s.isWindowFocused,
     ),
   );
 

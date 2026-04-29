@@ -15,6 +15,7 @@ export default function MiniSidebar() {
     s.notifications.filter((n) => !n.read).length,
   );
   const workspaceOutputActive = useStore((s) => s.workspaceOutputActive);
+  const isWindowFocused = useStore((s) => s.isWindowFocused);
 
   const addWorkspace = useStore((s) => s.addWorkspace);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
@@ -58,6 +59,7 @@ export default function MiniSidebar() {
             ws.id,
             activeWorkspaceId,
             workspaceOutputActive,
+            isWindowFocused,
           );
 
           return (
